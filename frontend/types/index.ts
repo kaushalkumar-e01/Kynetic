@@ -1,0 +1,86 @@
+import type { components } from "./openapi";
+
+export type Schemas = components["schemas"];
+
+// Normalized API Error Envelope
+export interface ApiErrorDetail {
+  code: string;
+  message: string;
+  details?: Array<{
+    location?: string;
+    message?: string;
+    type?: string;
+    [key: string]: unknown;
+  }> | unknown[];
+}
+
+export interface ApiErrorEnvelope {
+  error: ApiErrorDetail;
+}
+
+// Auth Types
+export type UserResponse = Schemas["UserResponse"];
+export type UserLoginRequest = Schemas["UserLoginRequest"];
+export type UserRegisterRequest = Schemas["UserRegisterRequest"];
+export type TokenResponse = Schemas["TokenResponse"];
+
+// Profile & Workspace Types
+export type UserProfileResponse = Schemas["UserProfileResponse"];
+export type UserProfileUpdate = Schemas["UserProfileUpdate"];
+export type WorkspaceSummaryResponse = Schemas["WorkspaceSummaryResponse"];
+export type ActivityResponse = Schemas["ActivityResponse"];
+export type UserSettingsResponse = Schemas["UserSettingsResponse"];
+export type UserSettingsUpdate = Schemas["UserSettingsUpdate"];
+
+// Resume Types
+export type ResumeResponse = Schemas["ResumeResponse"];
+export type ResumeAnalysisResponse = Schemas["ResumeAnalysisResponse"];
+
+// Skills & Capabilities Types
+export type SkillResponse = Schemas["SkillResponse"];
+export type UserCapabilityResponse = Schemas["UserCapabilityResponse"];
+export type EvidenceRecordResponse = Schemas["EvidenceRecordResponse"];
+export type CreateEvidenceRequest = Schemas["CreateEvidenceRequest"];
+
+// Assessment Types
+export type AssessmentResponse = Schemas["AssessmentResponse"];
+export type AssessmentTopicResponse = Schemas["AssessmentTopicResponse"];
+export type QuestionPublicResponse = Schemas["QuestionPublicResponse"];
+export type CreateAssessmentRequest = Schemas["CreateAssessmentRequest"];
+export type SubmitAnswerRequest = Schemas["SubmitAnswerRequest"];
+export type SubmitCodeRequest = Schemas["SubmitCodeRequest"];
+export type AssessmentAttemptResponse = Schemas["AssessmentAttemptResponse"];
+export type AssessmentSummaryResultsResponse = Schemas["AssessmentSummaryResultsResponse"];
+
+// Project Types
+export type ProjectResponse = Schemas["ProjectResponse"];
+export type ProjectAnalysisResponse = Schemas["ProjectAnalysisResponse"];
+export type ProjectCreate = Schemas["ProjectCreate"];
+export type ProjectUpdate = Schemas["ProjectUpdate"];
+export type GitHubConnectResponse = Schemas["GitHubConnectResponse"];
+export type GitHubRepoItem = Schemas["GitHubRepoItem"];
+export type ImportGitHubRepoRequest = Schemas["ImportGitHubRepoRequest"];
+
+// Goals & Placement Types
+export type GoalResponse = Schemas["GoalResponse"];
+export type GoalCreate = Schemas["GoalCreate"];
+export type GoalUpdate = Schemas["GoalUpdate"];
+export type JobMatchResponse = Schemas["JobMatchResponse"];
+export type JobMatchCreate = Schemas["JobMatchCreate"];
+
+// Roadmap Types
+export type RoadmapResponse = Schemas["RoadmapResponse"];
+export type RoadmapCreate = Schemas["RoadmapCreate"];
+export type RoadmapUpdate = Schemas["RoadmapUpdate"];
+export type MilestoneResponse = Schemas["MilestoneResponse"];
+export type MilestoneCreate = Schemas["MilestoneCreate"];
+export type MilestoneUpdate = Schemas["MilestoneUpdate"];
+
+// Assistant Types
+export type ConversationResponse = Schemas["ConversationResponse"];
+export type ConversationSummaryResponse = Schemas["ConversationSummaryResponse"];
+export type SendMessageRequest = Schemas["SendMessageRequest"];
+export type MessageResponse = Schemas["MessageResponse"];
+
+// UI Evidence Kind
+export type EvidenceKind = "claimed" | "assessed" | "project";
