@@ -26,7 +26,8 @@ class Settings(BaseSettings):
 
     LLM_PROVIDER: Optional[str] = None
     LLM_API_KEY: Optional[str] = None
-    LLM_MODEL: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    LLM_MODEL: Optional[str] = "gemini-1.5-flash"
 
     STORAGE_PROVIDER: str = "local"
     STORAGE_LOCAL_DIR: str = "./uploads"
