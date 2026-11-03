@@ -1,40 +1,184 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, BarChart3, BookOpenCheck, Check, ChevronRight, FileText, FolderKanban, Github, Goal, MessageCircle, Plus, Search, Sparkles, Target, Zap } from "lucide-react";
-import { AppShell, EvidenceBadge, PageHeading } from "@/components/AppShell";
-import { getCapabilities, getProjects } from "@/lib/api";
+import {
+  BarChart3,
+  BookOpenCheck,
+  ChevronRight,
+  FileText,
+  FolderKanban,
+  Github,
+  Goal,
+  Sparkles,
+  Target,
+  Zap,
+} from "lucide-react";
+import { AppShell, PageHeading } from "@/components/AppShell";
+import ProfileView from "@/components/views/ProfileView";
+import SettingsView from "@/components/views/SettingsView";
+import ResumeView from "@/components/views/ResumeView";
+import CapabilitiesView from "@/components/views/CapabilitiesView";
+import AssessmentsView from "@/components/views/AssessmentsView";
+import ProjectsView from "@/components/views/ProjectsView";
+import GoalsView from "@/components/views/GoalsView";
+import PlacementView from "@/components/views/PlacementView";
+import RoadmapsView from "@/components/views/RoadmapsView";
+import AssistantView from "@/components/views/AssistantView";
+import IntegrationsView from "@/components/views/IntegrationsView";
+import ProgressView from "@/components/views/ProgressView";
 
-const pageMeta: Record<string, { eyebrow: string; title: string; subtitle: string; icon: typeof Zap }> = {
-  resume: { eyebrow: "Evidence / Claimed", title: "Resume evidence", subtitle: "See what your resume says — and where stronger proof could make it credible.", icon: FileText },
-  capabilities: { eyebrow: "Evidence / Capability map", title: "Capabilities", subtitle: "Your skills, separated by signal and strengthened over time.", icon: Zap },
-  assessments: { eyebrow: "Evidence / Assessed", title: "Assessments", subtitle: "Short, focused checks that turn knowledge into a clearer signal.", icon: BookOpenCheck },
-  projects: { eyebrow: "Evidence / Project-supported", title: "Projects", subtitle: "The work behind your story, with context that helps it travel.", icon: FolderKanban },
-  integrations: { eyebrow: "Workspace / Sources", title: "Integrations", subtitle: "Bring your profile and repositories into one personal workspace.", icon: Github },
-  goals: { eyebrow: "Career / Direction", title: "Goals", subtitle: "A flexible set of directions to keep your next move in view.", icon: Goal },
-  placement: { eyebrow: "Career / Opportunity", title: "Placement matches", subtitle: "Roles where your current evidence is already telling a strong story.", icon: Target },
-  roadmaps: { eyebrow: "Career / Momentum", title: "Roadmaps", subtitle: "Focused paths that connect capability gaps to practical next steps.", icon: ChevronRight },
-  progress: { eyebrow: "Workspace / Analytics", title: "Progress", subtitle: "A longer view of how your capability is changing, not just what is checked off.", icon: BarChart3 },
-  assistant: { eyebrow: "Kynetic assistant", title: "A thoughtful next move, on demand.", subtitle: "Ask about your evidence, a target role, or what to work on next.", icon: Sparkles },
-  profile: { eyebrow: "Workspace / Identity", title: "Your profile", subtitle: "The context that helps Kynetic make your workspace feel like yours.", icon: Target },
-  settings: { eyebrow: "Workspace / Preferences", title: "Settings", subtitle: "Keep your workspace calm, clear and connected to how you work.", icon: Target },
+const pageMeta: Record<
+  string,
+  { eyebrow: string; title: string; subtitle: string; icon: typeof Zap }
+> = {
+  resume: {
+    eyebrow: "Evidence / Claimed",
+    title: "Resume evidence",
+    subtitle: "See what your resume says — and where stronger proof could make it credible.",
+    icon: FileText,
+  },
+  capabilities: {
+    eyebrow: "Evidence / Capability map",
+    title: "Capabilities",
+    subtitle: "Your skills, separated by signal and strengthened over time.",
+    icon: Zap,
+  },
+  assessments: {
+    eyebrow: "Evidence / Assessed",
+    title: "Assessments",
+    subtitle: "Short, focused checks that turn knowledge into a clearer signal.",
+    icon: BookOpenCheck,
+  },
+  projects: {
+    eyebrow: "Evidence / Project-supported",
+    title: "Projects",
+    subtitle: "The work behind your story, with context that helps it travel.",
+    icon: FolderKanban,
+  },
+  integrations: {
+    eyebrow: "Workspace / Sources",
+    title: "Integrations",
+    subtitle: "Bring your profile and repositories into one personal workspace.",
+    icon: Github,
+  },
+  goals: {
+    eyebrow: "Career / Direction",
+    title: "Goals",
+    subtitle: "A flexible set of directions to keep your next move in view.",
+    icon: Goal,
+  },
+  placement: {
+    eyebrow: "Career / Opportunity",
+    title: "Placement matches",
+    subtitle: "Roles where your current evidence is already telling a strong story.",
+    icon: Target,
+  },
+  roadmaps: {
+    eyebrow: "Career / Momentum",
+    title: "Roadmaps",
+    subtitle: "Focused paths that connect capability gaps to practical next steps.",
+    icon: ChevronRight,
+  },
+  progress: {
+    eyebrow: "Workspace / Analytics",
+    title: "Progress",
+    subtitle: "A longer view of how your capability is changing, not just what is checked off.",
+    icon: BarChart3,
+  },
+  assistant: {
+    eyebrow: "Kynetic assistant",
+    title: "A thoughtful next move, on demand.",
+    subtitle: "Ask about your evidence, a target role, or what to work on next.",
+    icon: Sparkles,
+  },
+  profile: {
+    eyebrow: "Workspace / Identity",
+    title: "Your profile",
+    subtitle: "The context that helps Kynetic make your workspace feel like yours.",
+    icon: Target,
+  },
+  settings: {
+    eyebrow: "Workspace / Preferences",
+    title: "Settings",
+    subtitle: "Keep your workspace calm, clear and connected to how you work.",
+    icon: Target,
+  },
 };
 
 function DetailCard({ kind }: { kind: string }) {
-  const capabilities = getCapabilities();
-  const projects = getProjects();
-  if (kind === "capabilities") return <div className="skill-grid">{capabilities.map((skill) => <Link href={`/capabilities/${skill.id}`} className="card skill-card" key={skill.id}><div className="skill-head"><div><div className="skill-name">{skill.name}</div><div className="skill-category">{skill.category} · {skill.delta}</div></div><div className="skill-score">{skill.score}</div></div><div className="progress-track" style={{ marginTop: 17 }}><div className="progress-value" style={{ width: `${skill.score}%` }} /></div><div className="skill-evidence">{skill.evidence.map((e) => <EvidenceBadge kind={e.kind} key={e.label} />)}</div></Link>)}</div>;
-  if (kind === "projects") return <div className="grid-3">{projects.map((project) => <Link href={`/projects/${project.id}`} className="card card-pad" key={project.id}><div style={{ display: "flex", justifyContent: "space-between" }}><div className="evidence-mark mark-project" style={{ width: 36, height: 36 }}><FolderKanban size={17} /></div><EvidenceBadge kind={project.evidence} /></div><h3 style={{ margin: "18px 0 7px", fontSize: 15 }}>{project.name}</h3><p className="muted" style={{ fontSize: 12, lineHeight: 1.5, minHeight: 38 }}>{project.description}</p><div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 14 }}>{project.stack.map((s) => <span key={s} style={{ fontSize: 10, padding: "5px 7px", background: "var(--surface-2)", borderRadius: 5, color: "var(--muted)" }}>{s}</span>)}</div><div style={{ display: "flex", justifyContent: "space-between", marginTop: 19, fontSize: 11 }}><span className="muted">Analysis completeness</span><strong>{project.completeness}%</strong></div><div className="progress-track" style={{ marginTop: 7 }}><div className="progress-value" style={{ width: `${project.completeness}%` }} /></div></Link>)}</div>;
-  if (kind === "resume") return <div className="grid-2"><section className="card card-pad"><div className="section-head" style={{ marginBottom: 7 }}><div><div className="card-kicker">Latest version</div><div className="card-title" style={{ marginTop: 6 }}>Maya Chen · Product engineer</div></div><button className="btn btn-outline"><FileText size={14} /> Open PDF</button></div><div className="card" style={{ boxShadow: "none", background: "var(--surface-2)", marginTop: 18, padding: 18 }}><div style={{ fontSize: 14, fontWeight: 700 }}>Experience & capabilities</div><div className="skeleton" style={{ marginTop: 16, width: "80%" }} /><div className="skeleton" style={{ marginTop: 10, width: "92%" }} /><div className="skeleton" style={{ marginTop: 10, width: "68%" }} /><div style={{ display: "flex", gap: 6, marginTop: 22 }}><EvidenceBadge kind="claimed" /><span className="muted" style={{ fontSize: 10, paddingTop: 5 }}>12 claims detected</span></div></div></section><section className="card card-pad"><div className="card-kicker">Needs evidence</div><div className="card-title" style={{ marginTop: 7 }}>Three claims to make more believable</div>{["Systems thinking", "API design", "Technical mentorship"].map((x, i) => <div className="activity" key={x}><div className="activity-icon"><Zap size={14} /></div><div className="activity-main"><div className="activity-title">{x}</div><div className="activity-detail">{i === 0 ? "Add a project or assessment" : "Add context from your work"}</div></div><ArrowRight size={14} className="muted" /></div>)}</section></div>;
-  if (kind === "assistant") return <div className="grid-2"><section className="card card-pad" style={{ minHeight: 340 }}><div className="activity"><div className="avatar" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}><Sparkles size={15} /></div><div className="activity-main"><div className="activity-title">Kynetic</div><div className="activity-detail">I’ve looked at your current evidence mix.</div></div><div className="activity-time">now</div></div><div style={{ margin: "28px 0 12px", padding: 15, borderRadius: 12, background: "var(--accent-soft)", fontSize: 13, lineHeight: 1.6 }}>Your strongest next move is to add a project note for systems thinking. You already have the claim — one concrete example will make the signal more useful.</div><div className="searchbox" style={{ width: "100%", marginTop: 120 }}><Search size={15} /><span>Ask about your capability map...</span><ArrowRight size={15} style={{ marginLeft: "auto" }} /></div></section><section className="card card-pad"><div className="card-kicker">Suggested prompts</div>{["What should I work on this week?", "Which roles fit my evidence today?", "Help me explain my strongest project."].map((p) => <button className="btn btn-outline" style={{ justifyContent: "space-between", width: "100%", marginTop: 10 }} key={p}>{p}<ArrowRight size={13} /></button>)}</section></div>;
-  if (kind === "integrations") return <div className="grid-3">{[[Github, "GitHub", "2 repositories connected", "Connected"], [Target, "LinkedIn", "Profile imported 3 days ago", "Connected"], [FileText, "Resume source", "Maya-Chen-Resume.pdf", "Current"]].map(([Icon, name, detail, status]) => { const I = Icon as typeof Github; return <section className="card card-pad" key={name as string}><I size={19} color="var(--accent)" /><h3 style={{ margin: "18px 0 6px", fontSize: 15 }}>{name as string}</h3><p className="muted" style={{ fontSize: 12 }}>{detail as string}</p><button className="btn btn-ghost" style={{ marginTop: 20, width: "100%", justifyContent: "center" }}><Check size={13} color="var(--teal)" /> {status as string}</button></section>; })}</div>;
-  if (kind === "settings" || kind === "profile") return <div className="grid-2"><section className="card card-pad"><div className="card-kicker">{kind === "profile" ? "Identity" : "Workspace preferences"}</div><div className="field"><label>{kind === "profile" ? "Full name" : "Workspace name"}</label><input className="input" defaultValue={kind === "profile" ? "Maya Chen" : "Maya’s capability workspace"} /></div><div className="field"><label>{kind === "profile" ? "Target direction" : "Email notifications"}</label><input className="input" defaultValue={kind === "profile" ? "Frontend engineering" : "Weekly digest · on"} /></div><button className="btn btn-primary" style={{ marginTop: 20 }}>Save changes</button></section><section className="card card-pad"><div className="card-kicker">Workspace principles</div><div className="activity"><div className="activity-icon"><Zap size={14} /></div><div className="activity-main"><div className="activity-title">Evidence stays visible</div><div className="activity-detail">Claims are never silently upgraded to proof.</div></div></div><div className="activity"><div className="activity-icon"><Target size={14} /></div><div className="activity-main"><div className="activity-title">You choose the next step</div><div className="activity-detail">Every module is accessible on its own.</div></div></div></section></div>;
-  return <div className="grid-2"><section className="card card-pad"><div className="card-kicker">In this workspace</div><div className="card-title" style={{ marginTop: 7 }}>A focused view of {kind}.</div><p className="page-subtitle" style={{ marginTop: 9 }}>This prototype page is independently accessible and ready to connect to a real API later. The interaction model stays calm, direct and evidence-aware.</p><div style={{ display: "flex", gap: 9, marginTop: 22 }}><Link href="/dashboard" className="btn btn-primary">Back to dashboard <ArrowRight size={14} /></Link><Link href={`/${kind}/new`} className="btn btn-ghost"><Plus size={14} /> Add new</Link></div></section><section className="card card-pad"><div className="card-kicker">Suggested next step</div><div style={{ marginTop: 14, display: "flex", gap: 12, alignItems: "flex-start" }}><div className="activity-icon"><Sparkles size={15} /></div><div><div className="card-title">Keep one thread moving</div><p className="muted" style={{ fontSize: 12, lineHeight: 1.55, marginTop: 7 }}>Use your current evidence to decide what deserves attention next — not what a wizard says you should do.</p></div></div></section></div>;
+  switch (kind) {
+    case "profile":
+      return <ProfileView />;
+    case "settings":
+      return <SettingsView />;
+    case "resume":
+      return <ResumeView />;
+    case "capabilities":
+      return <CapabilitiesView />;
+    case "assessments":
+      return <AssessmentsView />;
+    case "projects":
+      return <ProjectsView />;
+    case "goals":
+      return <GoalsView />;
+    case "placement":
+      return <PlacementView />;
+    case "roadmaps":
+      return <RoadmapsView />;
+    case "assistant":
+      return <AssistantView />;
+    case "integrations":
+      return <IntegrationsView />;
+    case "progress":
+      return <ProgressView />;
+    default:
+      return (
+        <div className="card card-pad" style={{ textAlign: "center", padding: "40px 20px" }}>
+          <Sparkles size={28} style={{ margin: "0 auto 10px", opacity: 0.5 }} />
+          <h3>Module: {kind}</h3>
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            This workspace module is active. Select an item or use the navigation sidebar.
+          </p>
+        </div>
+      );
+  }
 }
 
-export default function WorkspacePage({ kind, detail }: { kind: string; detail?: string[] }) {
-  const meta = pageMeta[kind] ?? { eyebrow: "Workspace", title: kind[0]?.toUpperCase() + kind.slice(1), subtitle: "Your workspace, in motion.", icon: Sparkles };
-  const Icon = meta.icon;
+export default function WorkspacePage({
+  kind,
+  detail,
+}: {
+  kind: string;
+  detail?: string[];
+}) {
+  const meta = pageMeta[kind] ?? {
+    eyebrow: "Workspace",
+    title: kind[0]?.toUpperCase() + kind.slice(1),
+    subtitle: "Your workspace, in motion.",
+    icon: Sparkles,
+  };
   const nested = detail?.length;
-  return <AppShell><PageHeading eyebrow={meta.eyebrow} title={nested ? `${meta.title} / detail` : meta.title} subtitle={meta.subtitle} action={kind !== "assistant" && kind !== "settings" && kind !== "profile" ? <button className="btn btn-primary"><Plus size={14} /> Add to {meta.title.toLowerCase()}</button> : undefined} /><div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 18, color: "var(--muted)", fontSize: 11 }}><Icon size={14} color="var(--accent)" /> {nested ? `Detail view · ${detail?.join(" / ")}` : "Independent workspace module"}</div><DetailCard kind={kind} /></AppShell>;
+
+  return (
+    <AppShell>
+      <PageHeading
+        eyebrow={meta.eyebrow}
+        title={nested ? `${meta.title} / detail` : meta.title}
+        subtitle={meta.subtitle}
+      />
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          marginBottom: 18,
+          color: "var(--muted)",
+          fontSize: 11,
+        }}
+      >
+        <meta.icon size={14} color="var(--accent)" />
+        <span>{nested ? `Detail view · ${detail?.join(" / ")}` : "Independent workspace module"}</span>
+      </div>
+      <DetailCard kind={kind} />
+    </AppShell>
+  );
 }
