@@ -54,6 +54,13 @@ class ProjectAnalysisResponse(BaseModel):
             return self.source_snapshot.get("inspected_files", [])
         return []
 
+    @computed_field
+    @property
+    def model_metadata(self) -> Dict[str, Any]:
+        if self.source_snapshot and isinstance(self.source_snapshot, dict):
+            return self.source_snapshot.get("model_metadata", {})
+        return {}
+
     class Config:
         from_attributes = True
 

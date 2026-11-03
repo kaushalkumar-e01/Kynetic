@@ -477,11 +477,44 @@ export default function ProjectsView() {
                       border: "1px solid var(--line)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", display: "flex", alignItems: "center", gap: 5 }}>
                         <Sparkles size={12} /> Technical Insights & Architecture
                       </span>
-                      <span className="muted" style={{ fontSize: 10 }}>Status: {analysis.status}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {analysis.model_metadata?.provider === "gemini" ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              background: "rgba(168, 85, 247, 0.15)",
+                              border: "1px solid rgba(168, 85, 247, 0.4)",
+                              color: "#c084fc",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                            }}
+                          >
+                            <Sparkles size={10} /> AI-Generated (Google Gemini)
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              background: "var(--surface)",
+                              border: "1px solid var(--line)",
+                              color: "var(--muted)",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                            }}
+                          >
+                            Deterministic Inspection
+                          </span>
+                        )}
+                        <span className="muted" style={{ fontSize: 10 }}>Status: {analysis.status}</span>
+                      </div>
                     </div>
 
                     {/* Inspected Manifests indicator */}

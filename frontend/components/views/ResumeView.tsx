@@ -329,13 +329,46 @@ export default function ResumeView() {
                         border: "1px solid var(--line)",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                           <Sparkles size={14} color="var(--accent)" /> Extracted Resume Intelligence
                         </span>
-                        <span className="muted" style={{ fontSize: 11 }}>
-                          Completed: {resume.analysis?.completed_at ? new Date(resume.analysis.completed_at).toLocaleTimeString() : "Ready"}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {(resume.analysis?.model_metadata as { provider?: string } | undefined)?.provider === "gemini" ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                background: "rgba(168, 85, 247, 0.15)",
+                                border: "1px solid rgba(168, 85, 247, 0.4)",
+                                color: "#c084fc",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 3,
+                              }}
+                            >
+                              <Sparkles size={10} /> AI-Extracted (Google Gemini)
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                background: "var(--surface)",
+                                border: "1px solid var(--line)",
+                                color: "var(--muted)",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                              }}
+                            >
+                              Deterministic Parser (Fallback)
+                            </span>
+                          )}
+                          <span className="muted" style={{ fontSize: 11 }}>
+                            Completed: {resume.analysis?.completed_at ? new Date(resume.analysis.completed_at).toLocaleTimeString() : "Ready"}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Candidate info if detected */}

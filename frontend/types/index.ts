@@ -57,6 +57,11 @@ export type ProjectAnalysisResponse = Schemas["ProjectAnalysisResponse"] & {
   major_features?: string[];
   technical_strengths?: string[];
   inspected_files?: string[];
+  model_metadata?: {
+    provider?: string;
+    model?: string;
+    note?: string;
+  };
 };
 export type ProjectResponse = Schemas["ProjectResponse"] & {
   technologies?: string[];

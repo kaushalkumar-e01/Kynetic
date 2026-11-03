@@ -211,7 +211,19 @@ Comparing current implementation against `plan.md` and `docs/API_CONTRACT.md`:
 
 ---
 
-## 11. Run & Verification Guide
+## 11. Google Gemini AI Integration & Dual Provider Strategy
+
+### Architecture & Security
+The Kynetic intelligence architecture has been extended with a first-class Google Gemini integration alongside the existing deterministic fallback provider:
+- **Backend-Only Secrets:** `GEMINI_API_KEY` is loaded exclusively inside the FastAPI backend via `app/core/config.py`. It is never prefixed with `NEXT_PUBLIC_` and never transmitted to client code.
+- **Model Configuration:** Configured via `GEMINI_MODEL` (defaults to `gemini-1.5-flash`).
+- **Resilient Fallback:** The `GeminiProvider` implements exponential backoff retry for transient network errors and rate limits (`ResourceExhausted`). In the event of persistent errors, invalid keys, or unconfigured environments, execution automatically delegates to `FallbackAIProvider` without breaking user workflows.
+- **Deterministic Numerical Boundaries:** All quantitative scores (assessment percentages, 3x/1x weighted placement match scores, and roadmap milestone progress) are strictly calculated by deterministic backend algorithms to eliminate LLM hallucinations.
+- **Frontend Provenance Transparency:** All API responses convey `model_metadata`. Frontend views (`ResumeView`, `ProjectsView`, `PlacementView`, `RoadmapsView`) dynamically display UI badges indicating whether analysis was performed via `AI-Generated (Google Gemini)` or `Deterministic Analysis (Fallback)`.
+
+---
+
+## 12. Run & Verification Guide
 
 ### 1. Backend Environment Setup & Launch
 ```bash

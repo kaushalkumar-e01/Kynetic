@@ -48,6 +48,8 @@ KNOWN_DEPENDENCY_TAGS = {
     "lucide-react": ("Lucide Icons", "frontend"),
 }
 
+_REPO_ANALYSIS_CACHE: Dict[str, Dict[str, Any]] = {}
+
 
 class RepositoryInspector:
     @staticmethod
@@ -63,8 +65,15 @@ class RepositoryInspector:
         cls,
         repository_url: str,
         access_token: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         owner, repo = cls.parse_repo_url(repository_url)
+
+        # Check Cache
+        cache_key = f"{owner}/{repo}".lower()
+        if not force_refresh and cache_key in _REPO_ANALYSIS_CACHE:
+            return dict(_REPO_ANALYSIS_CACHE[cache_key])
+
         headers = {
             "User-Agent": "Kynetic-Code-Intelligence/1.0",
             "Accept": "application/vnd.github.v3+json",
@@ -80,12 +89,12 @@ class RepositoryInspector:
 
         # 1. Fetch Repo Metadata from GitHub API
         try:
-            with httpx.Client(timeout=8.0, headers=headers) as client:
+            with httpx.Client(timeout=3.0, headers=headers) as client:
                 repo_resp = client.get(f"https://api.github.com/repos/{owner}/{repo}")
                 if repo_resp.status_code == 200:
                     repo_metadata = repo_resp.json()
                     is_private = repo_metadata.get("private", False)
-                elif repo_resp.status_code in [401, 403, 404]:
+                else:
                     accessible = False
 
                 if accessible:
@@ -95,7 +104,7 @@ class RepositoryInspector:
         except Exception:
             accessible = False
 
-        # 2. Check Candidate Manifest Files
+        # 2. Check Candidate Manifest & Source Files
         candidate_paths = [
             "README.md", "readme.md",
             "package.json", "frontend/package.json", "client/package.json", "web/package.json",
@@ -105,18 +114,21 @@ class RepositoryInspector:
             "Dockerfile", "backend/Dockerfile", "docker-compose.yml", "docker-compose.yaml",
             "tsconfig.json", "frontend/tsconfig.json",
             ".github/workflows/ci.yml", ".github/workflows/main.yml",
+            # Sampled architecture modules
+            "backend/app/main.py", "backend/app/api/v1/api.py", "backend/app/models/project.py",
+            "frontend/app/page.tsx", "frontend/components/AppShell.tsx",
+            "server/index.js", "src/index.ts", "src/App.tsx",
+            "backend/tests/test_projects.py", "tests/test_main.py",
         ]
 
-        # Fetch files via raw GitHub or GitHub contents API
-        default_branch = repo_metadata.get("default_branch", "main")
-        branches_to_try = [default_branch, "main", "master"]
-
-        with httpx.Client(timeout=6.0, headers=headers) as client:
-            for branch in set(branches_to_try):
-                for path in candidate_paths:
+        # Fetch files via raw GitHub only if repo is accessible
+        if accessible:
+            default_branch = repo_metadata.get("default_branch", "main")
+            with httpx.Client(timeout=2.0, headers=headers) as client:
+                for path in candidate_paths[:12]:
                     if path in inspected_files:
                         continue
-                    raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
+                    raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{path}"
                     try:
                         resp = client.get(raw_url)
                         if resp.status_code == 200 and len(resp.text.strip()) > 0:
@@ -124,7 +136,7 @@ class RepositoryInspector:
                     except Exception:
                         pass
 
-        # 3. Local Workspace Fallback Inspection (if repository matches local Kynetic or local disk repo)
+        # 3. Local Workspace Fallback Inspection (if repository matches local Kynetic)
         workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
         if not inspected_files or repo.lower() in ["kynetic", "kynetic-platform"]:
             for path in candidate_paths:
@@ -152,9 +164,10 @@ class RepositoryInspector:
                 "missing_requirements": ["Repository access permissions."],
                 "recommendations": ["Connect your GitHub account in Integrations to grant read access to this repository."],
                 "inspected_files": [],
+                "model_metadata": {"provider": "deterministic-fallback", "version": "1.0.0"},
             }
 
-        # 4. Synthesize Intelligence from Inspected Files
+        # 4. Synthesize Baseline Heuristics from Inspected Files
         detected_tech = set()
         demonstrated_skills = set()
         parsed_dependencies: List[str] = []
@@ -225,11 +238,10 @@ class RepositoryInspector:
 
         has_tests = any("test" in dep for dep in parsed_dependencies) or any("pytest" in dep for dep in parsed_dependencies)
 
-        # 5. Extract Purpose & Features from README or Description
+        # Extract Purpose & Features from README or Description
         readme_content = inspected_files.get("README.md") or inspected_files.get("readme.md") or ""
         repo_desc = repo_metadata.get("description") or ""
 
-        # Extract features from README bullet points
         major_features: List[str] = []
         if readme_content:
             for match in re.finditer(r"(?:^|\n)[-*+]\s+([^\n]{15,120})", readme_content):
@@ -250,7 +262,6 @@ class RepositoryInspector:
             f"Software engineering project '{repo}' by {owner}, implementing {', '.join(list(detected_tech)[:4])}."
         )
 
-        # 6. Synthesize Architecture Summary
         arch_parts = []
         if has_frontend and frontend_framework:
             arch_parts.append(f"{frontend_framework} UI layer")
@@ -273,7 +284,6 @@ class RepositoryInspector:
             f"Inspected {len(inspected_files)} repository configuration and manifest files directly."
         )
 
-        # 7. Identify Strengths & Missing Requirements
         strengths = []
         if "FastAPI" in detected_tech or "Next.js" in detected_tech:
             strengths.append(f"Modern high-performance frameworks ({', '.join(s for s in ['FastAPI', 'Next.js', 'React'] if s in detected_tech)}).")
@@ -305,12 +315,57 @@ class RepositoryInspector:
             missing_reqs.append("Testing: No automated unit testing framework (pytest/vitest) detected in manifests.")
             recommendations.append("Introduce automated unit test suites with coverage reports.")
         else:
-            recommendations.append(f"Maintain comprehensive test coverage for core business logic and API endpoints.")
+            recommendations.append("Maintain comprehensive test coverage for core business logic and API endpoints.")
 
         if "Next.js" in detected_tech and "FastAPI" in detected_tech:
             recommendations.append("Generate end-to-end typed API client bindings directly from FastAPI's OpenAPI specification (/api/v1/openapi.json).")
 
-        return {
+        # 5. Query LLM Provider (Gemini if configured, else FallbackAIProvider)
+        repo_context = {
+            "owner": owner,
+            "repo": repo,
+            "metadata": repo_metadata,
+            "inspected_files": list(inspected_files.keys()),
+            "sampled_code": {k: inspected_files[k][:2500] for k in list(inspected_files.keys())[:12]},
+            "detected_technologies": sorted(list(detected_tech)),
+            "demonstrated_skills": sorted(list(demonstrated_skills)),
+            "purpose": purpose,
+            "architecture_summary": arch_summary,
+            "major_features": major_features[:5],
+            "technical_strengths": strengths,
+            "missing_requirements": missing_reqs,
+            "recommendations": recommendations[:4],
+        }
+
+        model_metadata = {"provider": "deterministic-fallback", "version": "1.0.0"}
+        from app.ai.factory import get_llm_provider
+        try:
+            llm = get_llm_provider()
+            ai_result = llm.analyze_repository(repo_context)
+            if ai_result and isinstance(ai_result, dict):
+                for t in ai_result.get("detected_technologies", []):
+                    detected_tech.add(t)
+                for s in ai_result.get("demonstrated_skills", []):
+                    demonstrated_skills.add(s)
+
+                if ai_result.get("purpose"):
+                    purpose = ai_result["purpose"]
+                if ai_result.get("architecture_summary"):
+                    arch_summary = ai_result["architecture_summary"]
+                if ai_result.get("major_features"):
+                    major_features = ai_result["major_features"]
+                if ai_result.get("technical_strengths"):
+                    strengths = ai_result["technical_strengths"]
+                if ai_result.get("missing_requirements"):
+                    missing_reqs = ai_result["missing_requirements"]
+                if ai_result.get("recommendations"):
+                    recommendations = ai_result["recommendations"]
+                if ai_result.get("model_metadata"):
+                    model_metadata = ai_result["model_metadata"]
+        except Exception:
+            pass
+
+        final_result = {
             "accessible": True,
             "is_private": is_private,
             "owner": owner,
@@ -324,7 +379,12 @@ class RepositoryInspector:
             "missing_requirements": missing_reqs,
             "recommendations": recommendations[:4],
             "inspected_files": list(inspected_files.keys()),
+            "model_metadata": model_metadata,
         }
+
+        # Save to memory cache
+        _REPO_ANALYSIS_CACHE[cache_key] = final_result
+        return final_result
 
 
 repo_inspector = RepositoryInspector()

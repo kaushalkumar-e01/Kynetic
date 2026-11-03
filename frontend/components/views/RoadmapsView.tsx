@@ -242,6 +242,39 @@ export default function RoadmapsView() {
                     >
                       {r.status}
                     </span>
+                    {(r.milestones?.[0]?.resources as Array<{ type?: string; provider?: string }> | undefined)?.some(
+                      (res) => res.type === "model_metadata" && res.provider === "gemini"
+                    ) ? (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          background: "rgba(168, 85, 247, 0.15)",
+                          border: "1px solid rgba(168, 85, 247, 0.4)",
+                          color: "#c084fc",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        <Sparkles size={10} /> AI-Curated (Google Gemini)
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          background: "var(--surface)",
+                          border: "1px solid var(--line)",
+                          color: "var(--muted)",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        Capability-Grounded Curriculum
+                      </span>
+                    )}
                     {r.goal_id && <span className="muted" style={{ fontSize: 10 }}>Linked to Career Goal</span>}
                   </div>
                   <h3 style={{ fontSize: 16, margin: "10px 0 4px" }}>{r.title}</h3>

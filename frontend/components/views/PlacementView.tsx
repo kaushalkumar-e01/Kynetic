@@ -228,16 +228,51 @@ export default function PlacementView() {
             const partialSkills = (breakdown.partial_skills as SkillItem[]) || [];
             const missingSkills = (breakdown.missing_skills as SkillItem[]) || [];
             const actionPlan = (breakdown.action_plan as string[]) || [];
+            const modelMetadata = (breakdown.model_metadata as { provider?: string; model?: string }) || {};
+            const alignmentExplanation = (breakdown.alignment_explanation as string) || null;
             const isExpanded = expandedMatchId === m.id;
 
             return (
               <div className="card card-pad" key={m.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <div className="card-kicker">Evaluated Role</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div className="card-kicker">Evaluated Role</div>
+                      {modelMetadata.provider === "gemini" ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            background: "rgba(168, 85, 247, 0.15)",
+                            border: "1px solid rgba(168, 85, 247, 0.4)",
+                            color: "#c084fc",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                        >
+                          <Sparkles size={10} /> AI-Assisted (Google Gemini)
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "var(--surface)",
+                            border: "1px solid var(--line)",
+                            color: "var(--muted)",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          Deterministic Analysis
+                        </span>
+                      )}
+                    </div>
                     <h3 style={{ fontSize: 16, margin: "6px 0 4px" }}>{m.role_title}</h3>
                     <div className="muted" style={{ fontSize: 11 }}>
-                      Evaluated on {new Date(m.created_at).toLocaleDateString()} · Weighted Evidence Matching
+                      Evaluated on {new Date(m.created_at).toLocaleDateString()} · Weighted 3x/1x Capability Scoring
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -251,6 +286,12 @@ export default function PlacementView() {
                 <div className="progress-track" style={{ marginTop: 14 }}>
                   <div className="progress-value" style={{ width: `${Math.round(m.estimated_score)}%` }} />
                 </div>
+
+                {alignmentExplanation && (
+                  <p className="muted" style={{ fontSize: 11, lineHeight: 1.4, marginTop: 10, marginBottom: 4 }}>
+                    {alignmentExplanation}
+                  </p>
+                )}
 
                 {/* 3-Column Breakdown details */}
                 <div className="grid-2" style={{ marginTop: 16, gap: 12 }}>

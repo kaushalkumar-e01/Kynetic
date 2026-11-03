@@ -127,11 +127,17 @@ class ProjectService:
         analysis.demonstrated_skills = demonstrated_skills
         analysis.missing_requirements = missing_reqs
         analysis.recommendations = recommendations
+        model_meta = (
+            inspection.get("model_metadata", {"provider": "deterministic-fallback", "version": "1.0.0"})
+            if is_code_verified
+            else {"provider": "deterministic-fallback", "version": "1.0.0", "note": "Derived from project metadata."}
+        )
         analysis.source_snapshot = {
             "major_features": major_features,
             "technical_strengths": strengths,
             "inspected_files": inspected_files,
             "is_code_verified": is_code_verified,
+            "model_metadata": model_meta,
         }
         analysis.completed_at = datetime.now(timezone.utc)
 

@@ -2,8 +2,9 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models.roadmap import Roadmap, RoadmapMilestone
-from app.models.skill import UserCapability, Skill
+from app.models.skill import UserCapability
 from app.models.activity import UserActivity
+from app.ai.factory import get_llm_provider
 
 DOC_URLS = {
     "fastapi": "https://fastapi.tiangolo.com/",
@@ -20,6 +21,7 @@ DOC_URLS = {
     "express": "https://expressjs.com/",
     "django": "https://docs.djangoproject.com/",
     "flask": "https://flask.palletsprojects.com/",
+    "tailwindcss": "https://tailwindcss.com/docs",
     "tailwind css": "https://tailwindcss.com/docs",
     "pytest": "https://docs.pytest.org/",
     "aws": "https://docs.aws.amazon.com/",
@@ -104,80 +106,73 @@ class RoadmapService:
         target_skills: Optional[List[str]] = None,
         db: Session = None,
     ) -> Roadmap:
-        # Determine skills
-        if target_skills and len(target_skills) > 0:
-            skills = target_skills
-        else:
-            skills = RoadmapService._detect_default_skills(title, description)
-
-        # Query user capabilities to understand baseline proficiency
+        # 1. Query user capabilities
         user_caps = db.query(UserCapability).filter_by(user_id=user_id).all() if db else []
-        cap_score_by_name = {
-            c.skill.canonical_name.lower(): c.score
+        cap_list = [
+            {"skill_name": c.skill.canonical_name, "score": c.score, "estimated_band": c.estimated_band}
             for c in user_caps if c.skill
-        }
+        ]
+
+        # 2. Query LLM provider (Gemini or Fallback)
+        llm = get_llm_provider()
+        ai_roadmap = llm.generate_personalized_roadmap(title, description, cap_list, target_skills)
+        milestones_data = ai_roadmap.get("milestones", []) if ai_roadmap else []
+
+        # If LLM didn't return milestones, fall back to deterministic skills
+        if not milestones_data:
+            skills = target_skills if (target_skills and len(target_skills) > 0) else RoadmapService._detect_default_skills(title, description)
+            cap_score_by_name = {c.skill.canonical_name.lower(): c.score for c in user_caps if c.skill}
+            for idx, skill in enumerate(skills, start=1):
+                user_score = cap_score_by_name.get(skill.lower())
+                resources = RoadmapService._generate_milestone_resources(skill, user_score)
+                milestones_data.append({
+                    "title": f"Milestone {idx}: Core & Advanced {skill}",
+                    "description": f"Master fundamental concepts, practical idioms, design patterns, and enterprise best practices for {skill}." + (f" (Current baseline: {user_score:.0f}%)" if user_score and user_score >= 60 else ""),
+                    "ordering": idx,
+                    "resources": resources,
+                })
+            capstone_idx = len(skills) + 1
+            milestones_data.append({
+                "title": f"Milestone {capstone_idx}: Integrated Portfolio Project",
+                "description": f"Synthesize your mastery by architecting, testing, and deploying an end-to-end production application integrating {', '.join(skills[:3])} with automated testing and documentation.",
+                "ordering": capstone_idx,
+                "resources": [
+                    {"type": "project", "title": "Register & Analyze Project in Kynetic", "action": "project", "suggested_stack": skills[:4]},
+                    {"type": "documentation", "title": "Production Deployment & Architecture Checklist", "url": "https://github.com"},
+                ],
+            })
+
+        # Attach model metadata to milestone 1 resources for visibility
+        model_metadata = ai_roadmap.get("model_metadata", {"provider": "deterministic-fallback", "version": "1.0.0"})
+        if milestones_data and "resources" in milestones_data[0]:
+            milestones_data[0]["resources"].append({
+                "type": "model_metadata",
+                "provider": model_metadata.get("provider", "deterministic-fallback"),
+                "note": model_metadata.get("note", "Curriculum generated via capability signals."),
+            })
 
         roadmap = Roadmap(
             user_id=user_id,
             goal_id=goal_id,
             title=title,
-            description=description or f"Tailored skill progression roadmap targeting: {', '.join(skills)}",
+            description=description or f"Tailored skill progression roadmap targeting {title}",
             status="active",
         )
         db.add(roadmap)
         db.flush()
 
-        # Generate sequenced milestones
-        for idx, skill in enumerate(skills, start=1):
-            user_score = cap_score_by_name.get(skill.lower())
-            resources = RoadmapService._generate_milestone_resources(skill, user_score)
-
-            desc = (
-                f"Master fundamental concepts, practical idioms, design patterns, and enterprise best practices for {skill}."
-            )
-            if user_score and user_score >= 60.0:
-                desc += f" (Current demonstrated baseline: {user_score:.0f}%)."
-
+        # Persist milestones
+        for idx, ms_item in enumerate(milestones_data, start=1):
             ms = RoadmapMilestone(
                 user_id=user_id,
                 roadmap_id=roadmap.id,
-                title=f"Milestone {idx}: Core & Advanced {skill}",
-                description=desc,
+                title=ms_item.get("title", f"Milestone {idx}"),
+                description=ms_item.get("description", ""),
                 ordering=idx,
                 status="in_progress" if idx == 1 else "pending",
-                resources=resources,
+                resources=ms_item.get("resources", []),
             )
             db.add(ms)
-
-        # Capstone project milestone
-        capstone_idx = len(skills) + 1
-        capstone_title = f"Milestone {capstone_idx}: Integrated Portfolio Project"
-        capstone_desc = (
-            f"Synthesize your mastery by architecting, testing, and deploying an end-to-end production application "
-            f"integrating {', '.join(skills[:3])} with automated testing and documentation."
-        )
-        capstone = RoadmapMilestone(
-            user_id=user_id,
-            roadmap_id=roadmap.id,
-            title=capstone_title,
-            description=capstone_desc,
-            ordering=capstone_idx,
-            status="pending",
-            resources=[
-                {
-                    "type": "project",
-                    "title": "Register & Analyze Project in Kynetic",
-                    "action": "project",
-                    "suggested_stack": skills[:4],
-                },
-                {
-                    "type": "documentation",
-                    "title": "Production Deployment & Architecture Checklist",
-                    "url": "https://github.com",
-                },
-            ],
-        )
-        db.add(capstone)
 
         # Audit activity
         activity = UserActivity(
@@ -185,7 +180,7 @@ class RoadmapService:
             activity_type="roadmap_created",
             related_record_type="roadmap",
             related_record_id=roadmap.id,
-            details={"title": title, "milestones_count": len(skills) + 1, "skills": skills},
+            details={"title": title, "milestones_count": len(milestones_data), "provider": model_metadata.get("provider")},
         )
         db.add(activity)
 

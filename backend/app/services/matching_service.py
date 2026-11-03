@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.goal import JobMatch
 from app.models.skill import UserCapability, EvidenceRecord
 from app.models.activity import UserActivity
+from app.ai.factory import get_llm_provider
 
 JOB_SKILL_PATTERNS = {
     # Core engineering & languages
@@ -121,29 +122,63 @@ class MatchingService:
         source_reference: Optional[str] = None,
         db: Session = None,
     ) -> JobMatch:
-        req_text, pref_text = MatchingService._parse_job_sections(job_description)
-
-        req_skills = MatchingService._extract_skills_from_text(req_text)
-        pref_skills = MatchingService._extract_skills_from_text(pref_text)
-
-        # Fallback if no skills extracted
-        if not req_skills and not pref_skills:
-            req_skills = [("Python", "language"), ("REST API", "concept"), ("SQL", "language")]
-
-        # Ensure no duplicates between mandatory and preferred
-        req_set = {s[0] for s in req_skills}
-        pref_skills = [p for p in pref_skills if p[0] not in req_set]
-
-        # Query user's capabilities and evidence records
-        user_caps = db.query(UserCapability).filter_by(user_id=user_id).all()
+        # 1. Query user's capabilities and evidence records
+        user_caps = db.query(UserCapability).filter_by(user_id=user_id).all() if db else []
         user_cap_map = {c.skill.canonical_name.lower(): c for c in user_caps if c.skill}
 
-        evidence_records = db.query(EvidenceRecord).filter_by(user_id=user_id).all()
+        evidence_records = db.query(EvidenceRecord).filter_by(user_id=user_id).all() if db else []
         evidence_by_skill_name: Dict[str, List[EvidenceRecord]] = {}
         for ev in evidence_records:
             if ev.skill:
                 name_key = ev.skill.canonical_name.lower()
                 evidence_by_skill_name.setdefault(name_key, []).append(ev)
+
+        cap_list = [
+            {"skill_name": c.skill.canonical_name, "score": c.score, "estimated_band": c.estimated_band}
+            for c in user_caps if c.skill
+        ]
+        ev_list = [
+            {"skill_name": e.skill.canonical_name, "source_type": e.source_type, "confidence": e.confidence}
+            for e in evidence_records if e.skill
+        ]
+
+        # 2. Extract skills deterministically
+        req_text, pref_text = MatchingService._parse_job_sections(job_description)
+        deterministic_req = MatchingService._extract_skills_from_text(req_text)
+        deterministic_pref = MatchingService._extract_skills_from_text(pref_text)
+
+        # 3. Query LLM Provider (Gemini if key configured, or FallbackAIProvider)
+        llm = get_llm_provider()
+        ai_match = llm.analyze_job_match(job_description, cap_list, ev_list)
+
+        mandatory_skill_names = set(s[0] for s in deterministic_req)
+        preferred_skill_names = set(s[0] for s in deterministic_pref)
+
+        if ai_match and isinstance(ai_match, dict):
+            for m_skill in ai_match.get("mandatory_skills", []):
+                canon = m_skill.title() if len(m_skill) > 3 else m_skill.upper()
+                mandatory_skill_names.add(canon)
+            for p_skill in ai_match.get("preferred_skills", []):
+                canon = p_skill.title() if len(p_skill) > 3 else p_skill.upper()
+                if canon not in mandatory_skill_names:
+                    preferred_skill_names.add(canon)
+
+        # Fallback if no skills extracted
+        if not mandatory_skill_names and not preferred_skill_names:
+            mandatory_skill_names = {"Python", "REST API", "SQL"}
+
+        # Prevent duplicate skills between mandatory and preferred
+        preferred_skill_names = preferred_skill_names - mandatory_skill_names
+
+        # Map to category tuples
+        def resolve_category(skill_name: str) -> str:
+            lower = skill_name.lower()
+            if lower in JOB_SKILL_PATTERNS:
+                return JOB_SKILL_PATTERNS[lower][1]
+            return "concept"
+
+        req_skills = [(s, resolve_category(s)) for s in sorted(list(mandatory_skill_names))]
+        pref_skills = [(s, resolve_category(s)) for s in sorted(list(preferred_skill_names))]
 
         matched_skills = []
         partial_skills = []
@@ -156,17 +191,17 @@ class MatchingService:
             (s, cat, "preferred", 1.0) for s, cat in pref_skills
         ]
 
-        action_plan: List[str] = []
+        action_plan: List[str] = ai_match.get("action_plan", []) if ai_match else []
 
         for s_name, cat, req_type, weight in all_target_skills:
             total_possible_weight += weight * 1.0
             s_key = s_name.lower()
             cap = user_cap_map.get(s_key)
-            ev_list = evidence_by_skill_name.get(s_key, [])
+            ev_sublist = evidence_by_skill_name.get(s_key, [])
 
-            has_assessment = any(e.source_type == "assessment" for e in ev_list)
-            has_project = any(e.source_type == "project" for e in ev_list)
-            has_resume = any(e.source_type == "resume" for e in ev_list)
+            has_assessment = any(e.source_type == "assessment" for e in ev_sublist)
+            has_project = any(e.source_type == "project" for e in ev_sublist)
+            has_resume = any(e.source_type == "resume" for e in ev_sublist)
 
             # Build evidence provenance text
             provenance_parts = []
@@ -209,7 +244,7 @@ class MatchingService:
                         "provenance": provenance,
                     })
                     total_weighted_score += weight * confidence_mult
-                    if req_type == "mandatory":
+                    if req_type == "mandatory" and len(action_plan) < 5:
                         action_plan.append(f"Complete the practical assessment for {s_name} to upgrade your foundational {user_score}% score to proficient.")
             else:
                 provenance = f"Missing: Not detected in verified assessments, projects, or uploaded resume."
@@ -222,7 +257,7 @@ class MatchingService:
                     "requirement_type": req_type,
                     "provenance": provenance,
                 })
-                if req_type == "mandatory":
+                if req_type == "mandatory" and len(action_plan) < 5:
                     action_plan.append(f"Add a project demonstrating {s_name} or complete an assessment to fulfill this mandatory requirement.")
 
         final_score = round((total_weighted_score / total_possible_weight * 100.0) if total_possible_weight > 0 else 0.0, 1)
@@ -240,6 +275,12 @@ class MatchingService:
             "skills": [s[0] for s in all_target_skills],
         }
 
+        model_metadata = (
+            ai_match.get("model_metadata")
+            if (ai_match and isinstance(ai_match, dict))
+            else {"provider": "deterministic-fallback", "version": "1.0.0"}
+        )
+
         match_breakdown = {
             "matched_skills": matched_skills,
             "partial_skills": partial_skills,
@@ -250,6 +291,8 @@ class MatchingService:
             "mandatory_matched": len([s for s in matched_skills if s["requirement_type"] == "mandatory"]),
             "mandatory_missing": len([s for s in missing_skills if s["requirement_type"] == "mandatory"]),
             "action_plan": action_plan[:5],
+            "alignment_explanation": ai_match.get("alignment_explanation") if ai_match else None,
+            "model_metadata": model_metadata,
         }
 
         # Persist JobMatch
