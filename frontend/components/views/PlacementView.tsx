@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Check, Loader2, Plus, Sparkles, Target } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  FileSearch,
+  HelpCircle,
+  Lightbulb,
+  Loader2,
+  Plus,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import { placementApi } from "@/lib/api";
 import type { JobMatchResponse } from "@/types";
 
@@ -12,6 +25,7 @@ export default function PlacementView() {
   const [showMatchForm, setShowMatchForm] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
 
   const [roleTitle, setRoleTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -38,6 +52,11 @@ export default function PlacementView() {
     e.preventDefault();
     if (!roleTitle.trim() || !jobDescription.trim()) return;
 
+    if (jobDescription.trim().length < 20) {
+      setErrorMessage("Job description must contain at least 20 characters for meaningful requirement extraction.");
+      return;
+    }
+
     setMatching(true);
     setErrorMessage(null);
     setStatusMessage(null);
@@ -48,7 +67,7 @@ export default function PlacementView() {
         job_description: jobDescription.trim(),
       });
 
-      setStatusMessage(`Placement analysis complete: ${Math.round(match.estimated_score)}% alignment score.`);
+      setStatusMessage(`Placement evaluation complete: ${Math.round(match.estimated_score)}% alignment score based on your verified capability evidence.`);
       setRoleTitle("");
       setJobDescription("");
       setShowMatchForm(false);
@@ -62,6 +81,10 @@ export default function PlacementView() {
     } finally {
       setMatching(false);
     }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedMatchId((prev) => (prev === id ? null : id));
   };
 
   return (
@@ -136,21 +159,25 @@ export default function PlacementView() {
                 className="input"
                 value={roleTitle}
                 onChange={(e) => setRoleTitle(e.target.value)}
-                placeholder="e.g. Frontend Software Engineer (Intern / New Grad)"
+                placeholder="e.g. Backend Software Engineer (Python / FastAPI)"
                 required
               />
             </div>
 
             <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="jobDesc">Job Description / Requirements Text</label>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <label htmlFor="jobDesc">Job Description & Technical Requirements</label>
+                <span className="muted" style={{ fontSize: 11 }}>Minimum 20 characters</span>
+              </div>
               <textarea
                 id="jobDesc"
                 className="input"
                 style={{ minHeight: 90, resize: "vertical" }}
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
-                placeholder="Paste the job description or requirements section here (e.g. Requires React, TypeScript, APIs, Git)..."
+                placeholder="Paste the job description or technical requirements here (e.g. We are looking for an engineer proficient with Python, FastAPI, Docker, and PostgreSQL)..."
                 required
+                minLength={20}
               />
             </div>
 
@@ -178,15 +205,17 @@ export default function PlacementView() {
           <Target size={32} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
           <div style={{ fontSize: 15, fontWeight: 600 }}>No placement evaluations yet</div>
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            Paste a target role description to see where your verified evidence aligns and where skill gaps remain.
+            Paste a target role description above to see where your verified evidence aligns and where skill gaps remain.
           </p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {matches.map((m) => {
             const breakdown = (m.match_breakdown || {}) as Record<string, unknown>;
-            const matchedSkills = (breakdown.matched_skills as Array<{ skill?: string; status?: string }>) || [];
-            const missingSkills = (breakdown.missing_skills as Array<{ skill?: string; status?: string }>) || [];
+            const matchedSkills = (breakdown.matched_skills as Array<{ skill?: string; band?: string; user_score?: number }>) || [];
+            const partialSkills = (breakdown.partial_skills as Array<{ skill?: string; band?: string; user_score?: number }>) || [];
+            const missingSkills = (breakdown.missing_skills as Array<{ skill?: string; band?: string }>) || [];
+            const isExpanded = expandedMatchId === m.id;
 
             return (
               <div className="card card-pad" key={m.id}>
@@ -198,18 +227,21 @@ export default function PlacementView() {
                       Evaluated on {new Date(m.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                  <div className="score-ring" style={{ width: 56, height: 56 }}>
-                    <strong>{Math.round(m.estimated_score)}</strong>
-                    <small>%</small>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div className="score-ring" style={{ width: 56, height: 56 }}>
+                      <strong>{Math.round(m.estimated_score)}</strong>
+                      <small>%</small>
+                    </div>
                   </div>
                 </div>
 
-                <div className="progress-track" style={{ marginTop: 16 }}>
+                <div className="progress-track" style={{ marginTop: 14 }}>
                   <div className="progress-value" style={{ width: `${Math.round(m.estimated_score)}%` }} />
                 </div>
 
-                {/* Breakdown details */}
-                <div className="grid-2" style={{ marginTop: 18 }}>
+                {/* 3-Column Breakdown details */}
+                <div className="grid-2" style={{ marginTop: 16, gap: 12 }}>
+                  {/* Matched Skills */}
                   <div
                     style={{
                       background: "var(--surface-2)",
@@ -218,11 +250,11 @@ export default function PlacementView() {
                       border: "1px solid var(--line)",
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--teal)", marginBottom: 8 }}>
-                      Demonstrated & Matched Skills ({matchedSkills.length})
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--teal)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                      <TrendingUp size={13} /> Verified Matches ({matchedSkills.length})
                     </div>
                     {matchedSkills.length === 0 ? (
-                      <p className="muted" style={{ fontSize: 11 }}>None matched yet.</p>
+                      <p className="muted" style={{ fontSize: 11 }}>No verified matches for this role yet.</p>
                     ) : (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {matchedSkills.map((s, idx) => (
@@ -230,19 +262,21 @@ export default function PlacementView() {
                             key={idx}
                             style={{
                               fontSize: 11,
-                              padding: "3px 7px",
+                              padding: "3px 8px",
                               background: "rgba(0, 209, 178, 0.12)",
                               color: "var(--teal)",
                               borderRadius: 4,
+                              border: "1px solid rgba(0, 209, 178, 0.25)",
                             }}
                           >
-                            {s.skill || JSON.stringify(s)}
+                            {s.skill} <span style={{ opacity: 0.7, fontSize: 10 }}>· {s.band || "proficient"}</span>
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
 
+                  {/* Partial / Developing Skills */}
                   <div
                     style={{
                       background: "var(--surface-2)",
@@ -251,25 +285,26 @@ export default function PlacementView() {
                       border: "1px solid var(--line)",
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", marginBottom: 8 }}>
-                      Identified Capability Gaps ({missingSkills.length})
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-2)", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                      <Lightbulb size={13} /> Developing / Claimed ({partialSkills.length})
                     </div>
-                    {missingSkills.length === 0 ? (
-                      <p className="muted" style={{ fontSize: 11 }}>No significant gaps identified.</p>
+                    {partialSkills.length === 0 ? (
+                      <p className="muted" style={{ fontSize: 11 }}>No partial matches.</p>
                     ) : (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {missingSkills.map((s, idx) => (
+                        {partialSkills.map((s, idx) => (
                           <span
                             key={idx}
                             style={{
                               fontSize: 11,
-                              padding: "3px 7px",
-                              background: "rgba(108, 99, 255, 0.15)",
-                              color: "#c0bcff",
+                              padding: "3px 8px",
+                              background: "rgba(255, 187, 0, 0.12)",
+                              color: "var(--amber)",
                               borderRadius: 4,
+                              border: "1px solid rgba(255, 187, 0, 0.25)",
                             }}
                           >
-                            {s.skill || JSON.stringify(s)}
+                            {s.skill} <span style={{ opacity: 0.7, fontSize: 10 }}>· {s.band || "claimed"}</span>
                           </span>
                         ))}
                       </div>
@@ -277,14 +312,96 @@ export default function PlacementView() {
                   </div>
                 </div>
 
+                {/* Missing Skills */}
+                <div
+                  style={{
+                    background: "var(--surface-2)",
+                    padding: 12,
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                    marginTop: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#ff8787", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                    <AlertCircle size={13} /> Missing Capability Gaps ({missingSkills.length})
+                  </div>
+                  {missingSkills.length === 0 ? (
+                    <p className="muted" style={{ fontSize: 11 }}>No missing skill requirements found.</p>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {missingSkills.map((s, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            fontSize: 11,
+                            padding: "3px 8px",
+                            background: "rgba(255, 107, 107, 0.12)",
+                            color: "#ff8787",
+                            borderRadius: 4,
+                            border: "1px solid rgba(255, 107, 107, 0.25)",
+                          }}
+                        >
+                          {s.skill} <span style={{ opacity: 0.7, fontSize: 10 }}>· unverified</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Limitations and Actionable Next Steps */}
                 {m.limitations && m.limitations.length > 0 && (
                   <div style={{ marginTop: 14, fontSize: 11, color: "var(--muted)" }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Explainable Next Steps:</div>
-                    <ul style={{ paddingLeft: 18, lineHeight: 1.5 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4, color: "var(--text)" }}>Actionable Insights & Limitations:</div>
+                    <ul style={{ paddingLeft: 18, lineHeight: 1.5, margin: 0 }}>
                       {m.limitations.map((lim, i) => (
                         <li key={i}>{lim}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {/* Toggle Extracted Requirements Preview */}
+                <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => toggleExpand(m.id)}
+                    className="btn btn-outline"
+                    style={{ fontSize: 11, padding: "4px 8px" }}
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp size={12} /> Hide Extracted Requirements
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={12} /> View Extracted Requirements
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      background: "var(--surface)",
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      fontSize: 11,
+                      lineHeight: 1.5,
+                      color: "var(--muted)",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
+                      Target Skills Extracted from Job Description:
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {((m.extracted_requirements as { skills?: string[] })?.skills || []).map((sk, idx) => (
+                        <span key={idx} style={{ fontSize: 10, padding: "3px 6px", background: "var(--surface-2)", borderRadius: 4, border: "1px solid var(--line)" }}>
+                          {sk}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

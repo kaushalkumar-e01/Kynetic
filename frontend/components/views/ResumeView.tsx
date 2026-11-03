@@ -3,13 +3,17 @@
 import { useEffect, useState, useRef } from "react";
 import {
   AlertCircle,
+  Briefcase,
   Check,
   FileText,
+  FolderGit2,
+  GraduationCap,
+  Layers,
   Loader2,
+  Mail,
   Sparkles,
   Trash2,
   UploadCloud,
-  Zap,
 } from "lucide-react";
 import { resumesApi } from "@/lib/api";
 import type { ResumeResponse } from "@/types";
@@ -65,7 +69,7 @@ export default function ResumeView() {
 
     try {
       await resumesApi.uploadResume(file);
-      setStatusMessage(`Resume "${file.name}" uploaded successfully.`);
+      setStatusMessage(`Resume "${file.name}" uploaded successfully. You can now analyze it to extract capability signals.`);
       loadResumes();
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -86,10 +90,10 @@ export default function ResumeView() {
 
     try {
       const result = await resumesApi.analyzeResume(resumeId);
-      setStatusMessage("AI resume analysis completed successfully.");
+      setStatusMessage("AI resume analysis completed successfully. Extracted skills have been added to your Capability Profile as claimed signals.");
       // Update local state with latest analysis
       setResumes((prev) =>
-        prev.map((r) => (r.id === resumeId ? { ...r, analysis: result } : r))
+        prev.map((r) => (r.id === resumeId ? { ...r, status: "analyzed", analysis: result } : r))
       );
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -262,6 +266,11 @@ export default function ResumeView() {
               const hasAnalysis = !!resume.analysis;
               const extracted = (resume.analysis?.extracted_profile || {}) as Record<string, unknown>;
               const claimedSkills = (extracted.claimed_skills as Array<{ name: string; category?: string }>) || [];
+              const education = (extracted.education as string[]) || [];
+              const experience = (extracted.experience as string[]) || [];
+              const projects = (extracted.projects as string[]) || [];
+              const candidateEmail = extracted.candidate_email as string | undefined;
+              const candidateName = extracted.candidate_name as string | undefined;
 
               return (
                 <div className="card card-pad" key={resume.id}>
@@ -274,7 +283,7 @@ export default function ResumeView() {
                         <div style={{ fontSize: 14, fontWeight: 700 }}>{resume.original_filename}</div>
                         <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
                           {(resume.file_size / 1024).toFixed(1)} KB · Uploaded on{" "}
-                          {new Date(resume.created_at).toLocaleDateString()}
+                          {new Date(resume.created_at).toLocaleDateString()} · Status: <span style={{ textTransform: "capitalize" }}>{resume.status}</span>
                         </div>
                       </div>
                     </div>
@@ -321,20 +330,34 @@ export default function ResumeView() {
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                          <Sparkles size={13} color="var(--accent)" /> Analysis Result
+                        <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                          <Sparkles size={14} color="var(--accent)" /> Extracted Resume Intelligence
                         </span>
-                        <span className="muted" style={{ fontSize: 10 }}>
-                          Status: {resume.analysis?.status}
+                        <span className="muted" style={{ fontSize: 11 }}>
+                          Completed: {resume.analysis?.completed_at ? new Date(resume.analysis.completed_at).toLocaleTimeString() : "Ready"}
                         </span>
                       </div>
 
+                      {/* Candidate info if detected */}
+                      {(candidateName || candidateEmail) && (
+                        <div style={{ display: "flex", gap: 16, marginBottom: 12, fontSize: 12, color: "var(--muted)" }}>
+                          {candidateName && <span><strong>Name:</strong> {candidateName}</span>}
+                          {candidateEmail && (
+                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <Mail size={12} /> {candidateEmail}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Extracted Skills */}
                       {claimedSkills.length > 0 && (
-                        <div>
-                          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>
-                            Detected Claimed Skills ({claimedSkills.length}):
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                            <Layers size={13} color="var(--accent)" />
+                            Extracted Claimed Competencies ({claimedSkills.length}):
                           </div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {claimedSkills.map((s, idx) => (
                               <span
                                 key={idx}
@@ -353,10 +376,56 @@ export default function ResumeView() {
                         </div>
                       )}
 
+                      {/* Education & Experience in 2 columns */}
+                      <div className="grid-2" style={{ gap: 16, marginBottom: 16 }}>
+                        {/* Education */}
+                        {education.length > 0 && (
+                          <div style={{ background: "var(--surface)", padding: 12, borderRadius: 8, border: "1px solid var(--line)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--teal)" }}>
+                              <GraduationCap size={14} /> Education Details
+                            </div>
+                            <ul style={{ paddingLeft: 16, fontSize: 11, lineHeight: 1.5, margin: 0, color: "var(--muted)" }}>
+                              {education.map((edu, idx) => (
+                                <li key={idx} style={{ marginBottom: 4 }}>{edu}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Experience */}
+                        {experience.length > 0 && (
+                          <div style={{ background: "var(--surface)", padding: 12, borderRadius: 8, border: "1px solid var(--line)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--accent)" }}>
+                              <Briefcase size={14} /> Experience & History
+                            </div>
+                            <ul style={{ paddingLeft: 16, fontSize: 11, lineHeight: 1.5, margin: 0, color: "var(--muted)" }}>
+                              {experience.map((exp, idx) => (
+                                <li key={idx} style={{ marginBottom: 4 }}>{exp}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Projects Section */}
+                      {projects.length > 0 && (
+                        <div style={{ background: "var(--surface)", padding: 12, borderRadius: 8, border: "1px solid var(--line)", marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "var(--accent-2)" }}>
+                            <FolderGit2 size={14} /> Projects Mentioned
+                          </div>
+                          <ul style={{ paddingLeft: 16, fontSize: 11, lineHeight: 1.5, margin: 0, color: "var(--muted)" }}>
+                            {projects.map((proj, idx) => (
+                              <li key={idx} style={{ marginBottom: 4 }}>{proj}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Strengths */}
                       {resume.analysis?.strengths && resume.analysis.strengths.length > 0 && (
                         <div style={{ marginTop: 10 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--teal)", marginBottom: 4 }}>
-                            Strengths:
+                            Strengths Identified:
                           </div>
                           <ul style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.5, color: "var(--muted)" }}>
                             {resume.analysis.strengths.map((str, i) => (
@@ -366,6 +435,7 @@ export default function ResumeView() {
                         </div>
                       )}
 
+                      {/* Recommendations */}
                       {resume.analysis?.suggestions && resume.analysis.suggestions.length > 0 && (
                         <div style={{ marginTop: 10 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", marginBottom: 4 }}>

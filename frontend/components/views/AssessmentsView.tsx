@@ -3,14 +3,20 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   AlertCircle,
+  Award,
   BookOpenCheck,
   Check,
+  CheckCircle2,
   Code2,
   HelpCircle,
   Loader2,
   Lock,
   Play,
+  RotateCcw,
   Sparkles,
+  TrendingDown,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { assessmentsApi } from "@/lib/api";
 import type {
@@ -32,6 +38,7 @@ export default function AssessmentsView() {
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [lastFeedback, setLastFeedback] = useState<{ isCorrect: boolean; text: string; score: number } | null>(null);
   const [summaryResults, setSummaryResults] = useState<AssessmentSummaryResultsResponse | null>(null);
+  const [loadingPastResultId, setLoadingPastResultId] = useState<string | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -138,6 +145,25 @@ export default function AssessmentsView() {
     }
   };
 
+  const handleViewPastResults = async (assessmentId: string) => {
+    setLoadingPastResultId(assessmentId);
+    setErrorMessage(null);
+    try {
+      const results = await assessmentsApi.getAssessmentResults(assessmentId);
+      setSummaryResults(results);
+      // scroll into view
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err: unknown) {
+      if (err instanceof Error) setErrorMessage(err.message);
+    } finally {
+      setLoadingPastResultId(null);
+    }
+  };
+
+  // Derive strengths and weaknesses from attempts
+  const correctAttempts = summaryResults?.attempts?.filter((a) => a.is_correct) || [];
+  const incorrectAttempts = summaryResults?.attempts?.filter((a) => !a.is_correct) || [];
+
   return (
     <div>
       {statusMessage && (
@@ -212,7 +238,7 @@ export default function AssessmentsView() {
                 color: lastFeedback.isCorrect ? "var(--teal)" : "#ff8787",
               }}
             >
-              <Check size={14} />
+              {lastFeedback.isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
               <span>
                 <strong>{lastFeedback.isCorrect ? "Correct!" : "Note:"}</strong> {lastFeedback.text}
               </span>
@@ -293,7 +319,7 @@ export default function AssessmentsView() {
         </section>
       )}
 
-      {/* Summary Results Card if quiz just finished */}
+      {/* Summary Results Card if quiz finished or viewing past result */}
       {summaryResults && (
         <section
           className="card card-pad"
@@ -301,19 +327,103 @@ export default function AssessmentsView() {
         >
           <div className="section-head">
             <div>
-              <div className="card-kicker">Assessment Complete</div>
+              <div className="card-kicker">Performance Summary</div>
               <h2 style={{ fontSize: 18, margin: "4px 0" }}>{summaryResults.title} Results</h2>
             </div>
-            <div className="score-ring" style={{ width: 60, height: 60 }}>
-              <strong>{Math.round(summaryResults.average_score)}</strong>
-              <small>%</small>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div className="score-ring" style={{ width: 60, height: 60 }}>
+                <strong>{Math.round(summaryResults.average_score)}</strong>
+                <small>%</small>
+              </div>
+              <button
+                onClick={() => setSummaryResults(null)}
+                className="btn btn-outline"
+                style={{ fontSize: 11, padding: "5px 10px" }}
+              >
+                Close Summary
+              </button>
             </div>
           </div>
 
-          <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
-            You answered {summaryResults.correct_answers} of {summaryResults.total_questions} questions correctly.
-            Your capability score and evidence records have been updated in your profile.
+          <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
+            You answered <strong>{summaryResults.correct_answers}</strong> of <strong>{summaryResults.total_questions}</strong> questions correctly ({Math.round(summaryResults.average_score)}% overall accuracy).
+            Demonstrated performance has updated your verified capability band in your profile.
           </p>
+
+          {/* Strengths & Weaknesses Breakdown */}
+          <div className="grid-2" style={{ gap: 16, marginTop: 18 }}>
+            {/* Strengths */}
+            <div style={{ background: "var(--surface-2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "var(--teal)", marginBottom: 8 }}>
+                <TrendingUp size={15} /> Strengths Demonstrated ({correctAttempts.length})
+              </div>
+              {correctAttempts.length === 0 ? (
+                <p className="muted" style={{ fontSize: 11 }}>No correct answers in this session. Review the explanations below.</p>
+              ) : (
+                <ul style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.5, margin: 0, color: "var(--muted)" }}>
+                  {correctAttempts.map((a, i) => (
+                    <li key={i} style={{ marginBottom: 6 }}>
+                      {a.feedback || "Question answered accurately."}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Areas for Improvement */}
+            <div style={{ background: "var(--surface-2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#ff8787", marginBottom: 8 }}>
+                <TrendingDown size={15} /> Areas for Review ({incorrectAttempts.length})
+              </div>
+              {incorrectAttempts.length === 0 ? (
+                <p className="muted" style={{ fontSize: 11 }}>Perfect run! No incorrect answers recorded.</p>
+              ) : (
+                <ul style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.5, margin: 0, color: "var(--muted)" }}>
+                  {incorrectAttempts.map((a, i) => (
+                    <li key={i} style={{ marginBottom: 6 }}>
+                      {a.feedback || "Incorrect response. Review core topic documentation."}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Question Details List */}
+          {summaryResults.attempts && summaryResults.attempts.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: "var(--text)" }}>
+                Question-by-Question Evaluation Breakdown:
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {summaryResults.attempts.map((att, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 6,
+                      background: att.is_correct ? "rgba(0, 209, 178, 0.08)" : "rgba(255, 107, 107, 0.08)",
+                      border: `1px solid ${att.is_correct ? "rgba(0, 209, 178, 0.25)" : "rgba(255, 107, 107, 0.25)"}`,
+                      fontSize: 12,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {att.is_correct ? <CheckCircle2 size={15} color="var(--teal)" /> : <XCircle size={15} color="#ff8787" />}
+                      <span>
+                        <strong>Q{idx + 1}:</strong> {att.feedback}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: att.is_correct ? "var(--teal)" : "#ff8787" }}>
+                      {Math.round(att.score)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -446,6 +556,8 @@ export default function AssessmentsView() {
             {pastAssessments.map((a) => {
               const res = (a.summary_result || {}) as Record<string, unknown>;
               const avg = typeof res.average_score === "number" ? res.average_score : 0;
+              const isViewing = loadingPastResultId === a.id;
+
               return (
                 <div className="card card-pad" key={a.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -468,15 +580,31 @@ export default function AssessmentsView() {
                         Started {new Date(a.started_at).toLocaleDateString()}
                       </div>
                     </div>
-                    {a.status === "completed" && (
+                    {a.status === "completed" ? (
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: 18, fontWeight: 700, color: "var(--teal)" }}>
                           {Math.round(avg)}%
                         </div>
                         <div className="muted" style={{ fontSize: 10 }}>Score</div>
                       </div>
+                    ) : (
+                      <span className="muted" style={{ fontSize: 11 }}>In Progress</span>
                     )}
                   </div>
+
+                  {a.status === "completed" && (
+                    <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        onClick={() => handleViewPastResults(a.id)}
+                        className="btn btn-outline"
+                        style={{ fontSize: 11, padding: "5px 10px" }}
+                        disabled={isViewing}
+                      >
+                        {isViewing ? <Loader2 size={12} className="animate-spin" /> : <Award size={12} />}
+                        View Breakdown
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -48,41 +48,41 @@ export async function listRoadmaps(): Promise<RoadmapResponse[]> {
         id: "rm-1",
         user_id: "mock_user_id",
         title: "Frontend Engineering Mastery",
-        description: "Path from foundational React knowledge to proficient portfolio development.",
+        description: "Milestones covering React, TypeScript, state management, and performance.",
         status: "active",
-        progress_percentage: 60,
+        progress_percentage: 40,
         milestones: [
           {
             id: "ms-1",
             user_id: "mock_user_id",
             roadmap_id: "rm-1",
-            title: "Pass React Patterns Assessment",
-            description: "Demonstrate solid grasp of state management, custom hooks, and rendering optimization.",
+            title: "Advanced React Patterns",
+            description: "Custom hooks, compound components, render props.",
             ordering: 1,
-            status: "completed",
             resources: [],
+            status: "completed",
             created_at: new Date().toISOString(),
           },
           {
             id: "ms-2",
             user_id: "mock_user_id",
             roadmap_id: "rm-1",
-            title: "Connect and Analyze Portfolio Project",
-            description: "Attach GitHub repository and verify tech stack implementation.",
+            title: "TypeScript Generics & Utility Types",
+            description: "Deep dive into conditional types, mapped types, and strict mode.",
             ordering: 2,
-            status: "completed",
             resources: [],
+            status: "completed",
             created_at: new Date().toISOString(),
           },
           {
             id: "ms-3",
             user_id: "mock_user_id",
             roadmap_id: "rm-1",
-            title: "Close Systems Design Gap",
-            description: "Complete an architectural case study or add caching/API layer to project.",
+            title: "Full-Stack Project Capstone",
+            description: "Deploy a production-ready application with CI/CD.",
             ordering: 3,
-            status: "in_progress",
             resources: [],
+            status: "pending",
             created_at: new Date().toISOString(),
           },
         ],
@@ -91,34 +91,44 @@ export async function listRoadmaps(): Promise<RoadmapResponse[]> {
       },
     ];
   }
-  return apiClient<RoadmapResponse[]>("/roadmaps", {
-    method: "GET",
-  });
+  return apiClient<RoadmapResponse[]>("/roadmaps");
 }
 
-export async function getRoadmap(roadmapId: string): Promise<RoadmapResponse> {
+export async function getRoadmap(id: string): Promise<RoadmapResponse> {
   if (shouldUseMock("roadmaps")) {
     const list = await listRoadmaps();
-    return list.find((r) => r.id === roadmapId) || list[0];
+    const found = list.find((r) => r.id === id);
+    if (found) return found;
+    return list[0];
   }
-  return apiClient<RoadmapResponse>(`/roadmaps/${roadmapId}`, {
-    method: "GET",
+  return apiClient<RoadmapResponse>(`/roadmaps/${id}`);
+}
+
+export async function updateRoadmap(id: string, data: RoadmapUpdate): Promise<RoadmapResponse> {
+  if (shouldUseMock("roadmaps")) {
+    return {
+      id,
+      user_id: "mock_user_id",
+      title: data.title || "Updated Roadmap",
+      status: data.status || "active",
+      progress_percentage: 50,
+      milestones: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+  return apiClient<RoadmapResponse>(`/roadmaps/${id}`, {
+    method: "PATCH",
+    body: data,
   });
 }
 
-export async function updateRoadmap(roadmapId: string, data: RoadmapUpdate): Promise<RoadmapResponse> {
+export async function deleteRoadmap(id: string): Promise<{ message: string }> {
   if (shouldUseMock("roadmaps")) {
-    const current = await getRoadmap(roadmapId);
-    return {
-      ...current,
-      title: data.title || current.title,
-      description: data.description ?? current.description,
-      status: data.status || current.status,
-    };
+    return { message: "Roadmap deleted successfully." };
   }
-  return apiClient<RoadmapResponse>(`/roadmaps/${roadmapId}`, {
-    method: "PATCH",
-    body: data,
+  return apiClient<{ message: string }>(`/roadmaps/${id}`, {
+    method: "DELETE",
   });
 }
 

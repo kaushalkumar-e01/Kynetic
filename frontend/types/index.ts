@@ -84,3 +84,4 @@ export type MessageResponse = Schemas["MessageResponse"];
 
 // UI Evidence Kind
 export type EvidenceKind = "claimed" | "assessed" | "project";
+

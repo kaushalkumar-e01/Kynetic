@@ -263,3 +263,4 @@ npm run dev
 ```
 - Web Application: `http://localhost:3000`
 - Access `/login` to register a new user or log in to the workspace dashboard.
+

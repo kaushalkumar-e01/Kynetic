@@ -116,6 +116,24 @@ def update_roadmap(
     return dto
 
 
+@router.delete(
+    "/roadmaps/{roadmap_id}",
+    summary="Delete a roadmap and its milestones",
+)
+def delete_roadmap(
+    roadmap_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    roadmap = db.query(Roadmap).filter_by(id=roadmap_id, user_id=current_user.id).first()
+    if not roadmap:
+        raise NotFoundException("Roadmap not found or access denied.")
+
+    db.delete(roadmap)
+    db.commit()
+    return {"message": "Roadmap deleted successfully."}
+
+
 @router.post(
     "/roadmaps/{roadmap_id}/milestones",
     response_model=MilestoneResponse,
@@ -174,4 +192,3 @@ def update_milestone(
     db.commit()
     db.refresh(milestone)
     return MilestoneResponse.model_validate(milestone)
-

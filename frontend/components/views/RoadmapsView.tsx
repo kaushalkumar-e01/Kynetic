@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, AlertCircle, Check, CheckCircle2, Circle, Loader2, Plus } from "lucide-react";
+import {
+  Activity,
+  AlertCircle,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  Circle,
+  ExternalLink,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { roadmapsApi } from "@/lib/api";
 import type { RoadmapResponse } from "@/types";
 
@@ -55,7 +66,7 @@ export default function RoadmapsView() {
         target_skills: skills.length > 0 ? skills : undefined,
       });
 
-      setStatusMessage("Learning roadmap generated successfully.");
+      setStatusMessage("Learning roadmap and sequenced milestones generated successfully.");
       setTitle("");
       setDescription("");
       setTargetSkills("");
@@ -80,6 +91,21 @@ export default function RoadmapsView() {
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message);
+      }
+    }
+  };
+
+  const handleDeleteRoadmap = async (roadmapId: string) => {
+    if (!confirm("Are you sure you want to delete this roadmap and all its milestones?")) return;
+    try {
+      await roadmapsApi.deleteRoadmap(roadmapId);
+      setStatusMessage("Roadmap deleted.");
+      setRoadmaps((prev) => prev.filter((r) => r.id !== roadmapId));
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Failed to delete roadmap.");
       }
     }
   };
@@ -152,7 +178,7 @@ export default function RoadmapsView() {
                 className="input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Frontend Engineering Mastery"
+                placeholder="e.g. Backend Platform Engineering Mastery"
                 required
               />
             </div>
@@ -170,13 +196,13 @@ export default function RoadmapsView() {
             </div>
 
             <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="rmSkills">Target Skills (comma-separated)</label>
+              <label htmlFor="rmSkills">Target Skills (comma-separated, e.g. Python, FastAPI, Docker, PostgreSQL)</label>
               <input
                 id="rmSkills"
                 className="input"
                 value={targetSkills}
                 onChange={(e) => setTargetSkills(e.target.value)}
-                placeholder="e.g. React, TypeScript, APIs, System Design"
+                placeholder="e.g. Python, FastAPI, Docker, PostgreSQL"
               />
             </div>
 
@@ -206,27 +232,40 @@ export default function RoadmapsView() {
             <div className="card card-pad" key={r.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      padding: "3px 7px",
-                      borderRadius: 4,
-                      background: "rgba(0, 209, 178, 0.12)",
-                      color: "var(--teal)",
-                    }}
-                  >
-                    {r.status}
-                  </span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        padding: "3px 7px",
+                        borderRadius: 4,
+                        background: "rgba(0, 209, 178, 0.12)",
+                        color: "var(--teal)",
+                      }}
+                    >
+                      {r.status}
+                    </span>
+                    {r.goal_id && <span className="muted" style={{ fontSize: 10 }}>Linked to Career Goal</span>}
+                  </div>
                   <h3 style={{ fontSize: 16, margin: "10px 0 4px" }}>{r.title}</h3>
                   {r.description && <p className="muted" style={{ fontSize: 12 }}>{r.description}</p>}
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "var(--teal)" }}>
-                    {Math.round(r.progress_percentage || 0)}%
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "var(--teal)" }}>
+                      {Math.round(r.progress_percentage || 0)}%
+                    </div>
+                    <div className="muted" style={{ fontSize: 10 }}>Completed</div>
                   </div>
-                  <div className="muted" style={{ fontSize: 10 }}>Completed</div>
+                  <button
+                    onClick={() => handleDeleteRoadmap(r.id)}
+                    className="icon-btn"
+                    title="Delete roadmap"
+                    aria-label="Delete roadmap"
+                  >
+                    <Trash2 size={14} color="#ff8787" />
+                  </button>
                 </div>
               </div>
 
@@ -237,64 +276,100 @@ export default function RoadmapsView() {
               {/* Milestones list */}
               <div style={{ marginTop: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
-                  Progression Milestones ({r.milestones?.length || 0})
+                  Progression Milestones ({r.milestones?.length || 0}):
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {(r.milestones || []).map((ms) => {
                     const done = ms.status === "completed";
+                    const resources = (ms.resources || []) as Array<{ title?: string; url?: string; action?: string }>;
+
                     return (
                       <div
                         key={ms.id}
                         style={{
                           display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
+                          flexDirection: "column",
+                          gap: 6,
                           padding: "10px 12px",
                           borderRadius: 8,
                           background: done ? "rgba(0, 209, 178, 0.06)" : "var(--surface-2)",
                           border: "1px solid var(--line)",
                         }}
                       >
-                        <button
-                          onClick={() => toggleMilestone(r.id, ms.id, ms.status)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            color: done ? "var(--teal)" : "var(--muted)",
-                            marginTop: 2,
-                          }}
-                          title={done ? "Mark pending" : "Mark completed"}
-                        >
-                          {done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                        </button>
-                        <div style={{ flex: 1 }}>
-                          <div
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <button
+                            onClick={() => toggleMilestone(r.id, ms.id, ms.status)}
                             style={{
-                              fontSize: 13,
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              color: done ? "var(--teal)" : "var(--muted)",
+                              marginTop: 2,
+                            }}
+                            title={done ? "Mark pending" : "Mark completed"}
+                          >
+                            {done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                          </button>
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                textDecoration: done ? "line-through" : "none",
+                                color: done ? "var(--muted)" : "var(--fg)",
+                              }}
+                            >
+                              {ms.title}
+                            </div>
+                            {ms.description && (
+                              <p className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                                {ms.description}
+                              </p>
+                            )}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              textTransform: "uppercase",
+                              color: done ? "var(--teal)" : "var(--muted)",
                               fontWeight: 600,
-                              textDecoration: done ? "line-through" : "none",
-                              color: done ? "var(--muted)" : "var(--fg)",
                             }}
                           >
-                            {ms.title}
-                          </div>
-                          {ms.description && (
-                            <p className="muted" style={{ fontSize: 11, marginTop: 2 }}>
-                              {ms.description}
-                            </p>
-                          )}
+                            {ms.status}
+                          </span>
                         </div>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            textTransform: "uppercase",
-                            color: done ? "var(--teal)" : "var(--muted)",
-                          }}
-                        >
-                          {ms.status}
-                        </span>
+
+                        {/* Attached Learning Resources */}
+                        {resources.length > 0 && (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 28, marginTop: 2 }}>
+                            {resources.map((res, i) => (
+                              <span
+                                key={i}
+                                style={{
+                                  fontSize: 10,
+                                  color: "var(--accent)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  background: "var(--surface)",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  border: "1px solid var(--line)",
+                                }}
+                              >
+                                <BookOpen size={10} />
+                                {res.url ? (
+                                  <a href={res.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 2 }}>
+                                    {res.title} <ExternalLink size={9} />
+                                  </a>
+                                ) : (
+                                  <span>{res.title}</span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
