@@ -1,15 +1,20 @@
 # Kynetic: Core Feature Completion Tracker & Verification Matrix
 
-**Last Updated:** November 4, 2026  
+**Last Updated:** November 4, 2026 (Core Intelligence Upgrade)  
 **Branch:** `feature/frontend-integration`  
 **Engineer:** Senior Full-Stack Integration & QA Engineer  
-**Status:** **ALL FIVE CORE PRODUCT FEATURES VERIFIED COMPLETE (5 / 5)**  
+**Status:** **ALL FIVE CORE PRODUCT FEATURES VERIFIED COMPLETE WITH ADVANCED INTELLIGENCE (5 / 5)**  
 
 ---
 
 ## Executive Overview
 
-Per strict instructions, authentication, login, registration, and basic dashboard navigation were excluded from the core product feature count. All five mandatory user-facing features have been made genuinely functional, end-to-end integrated, and verified against the live FastAPI backend with real PDF parsing, actual question scoring, heuristic project intelligence, capability-grounded placement matching, and persistent roadmap milestones.
+Per strict instructions, authentication, login, registration, and basic dashboard navigation were excluded from the core product feature count. All five mandatory user-facing features have been made genuinely functional, end-to-end integrated, and upgraded with deep intelligence:
+1. **Resume Intelligence**: Real PDF text extraction with `pypdf`, AI capability profile sync, and persistent versioning.
+2. **Skill Assessment**: Dynamic adaptive questions, server-side scoring, and persistent assessment evidence.
+3. **Project Intelligence (Upgraded)**: Direct repository manifest inspection (`package.json`, `requirements.txt`, `Dockerfile`, etc.), major feature extraction from `README.md`, technical strengths identification, categorized `TechMultiSelect` dropdowns, and verified code capability ingestion.
+4. **Placement Matcher (Upgraded)**: Section-aware parsing separating mandatory (3x weight) from preferred (1x weight) skills, weighted evidence confidence (verified = 1.0, developing = 0.65, claimed = 0.35), explainable provenance breakdown, and tailored actionable career improvement steps.
+5. **Career Roadmaps & Goals (Upgraded)**: Goal-specific curricula (Frontend, Backend, Full Stack, DevOps, Data Science, Mobile), structured learning objectives, direct official documentation links, role selector (`RoleSelect`), and technology selector (`TechMultiSelect`).
 
 ### Summary Scorecard
 
@@ -17,9 +22,9 @@ Per strict instructions, authentication, login, registration, and basic dashboar
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **1. Resume Intelligence** | ✅ Passed | ✅ Passed | ✅ Passed | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
 | **2. Skill Assessment** | ✅ Passed | ✅ Passed | ✅ Passed | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
-| **3. Project Intelligence** | ✅ Passed | ✅ Passed | ✅ Passed | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
-| **4. Placement Matcher** | ✅ Passed | ✅ Passed | ✅ Passed | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
-| **5. Career Roadmaps & Goals** | ✅ Passed | ✅ Passed | ✅ Passed | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
+| **3. Project Intelligence** | ✅ Passed | ✅ Passed | ✅ Deep Code Inspection | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
+| **4. Placement Matcher** | ✅ Passed | ✅ Passed | ✅ Weighted 3x/1x Engine | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
+| **5. Career Roadmaps & Goals** | ✅ Passed | ✅ Passed | ✅ Track Curricula & Docs | ✅ Passed | ✅ 100% | ✅ 200 OK | **VERIFIED COMPLETE** |
 
 ---
 

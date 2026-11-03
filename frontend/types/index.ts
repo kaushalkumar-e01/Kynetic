@@ -53,10 +53,21 @@ export type AssessmentAttemptResponse = Schemas["AssessmentAttemptResponse"];
 export type AssessmentSummaryResultsResponse = Schemas["AssessmentSummaryResultsResponse"];
 
 // Project Types
-export type ProjectResponse = Schemas["ProjectResponse"];
-export type ProjectAnalysisResponse = Schemas["ProjectAnalysisResponse"];
-export type ProjectCreate = Schemas["ProjectCreate"];
-export type ProjectUpdate = Schemas["ProjectUpdate"];
+export type ProjectAnalysisResponse = Schemas["ProjectAnalysisResponse"] & {
+  major_features?: string[];
+  technical_strengths?: string[];
+  inspected_files?: string[];
+};
+export type ProjectResponse = Schemas["ProjectResponse"] & {
+  technologies?: string[];
+  latest_analysis?: ProjectAnalysisResponse | null;
+};
+export type ProjectCreate = Omit<Schemas["ProjectCreate"], "technologies"> & {
+  technologies?: string[];
+};
+export type ProjectUpdate = Omit<Schemas["ProjectUpdate"], "technologies"> & {
+  technologies?: string[];
+};
 export type GitHubConnectResponse = Schemas["GitHubConnectResponse"];
 export type GitHubRepoItem = Schemas["GitHubRepoItem"];
 export type ImportGitHubRepoRequest = Schemas["ImportGitHubRepoRequest"];

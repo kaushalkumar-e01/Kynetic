@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
+  Code2,
   Edit2,
+  FileCode,
   FolderKanban,
   Lightbulb,
   ListChecks,
   Loader2,
   Plus,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Wrench,
@@ -18,6 +22,7 @@ import {
 import { projectsApi } from "@/lib/api";
 import type { ProjectResponse } from "@/types";
 import { EvidenceBadge } from "@/components/AppShell";
+import TechMultiSelect from "@/components/ui/TechMultiSelect";
 
 export default function ProjectsView() {
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
@@ -33,12 +38,14 @@ export default function ProjectsView() {
   const [description, setDescription] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [sourceType, setSourceType] = useState("manual");
+  const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
 
   // Edit project state
   const [editingProject, setEditingProject] = useState<ProjectResponse | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editRepoUrl, setEditRepoUrl] = useState("");
+  const [editTechs, setEditTechs] = useState<string[]>([]);
   const [updating, setUpdating] = useState(false);
 
   const loadProjects = () => {
@@ -73,12 +80,14 @@ export default function ProjectsView() {
         description: description.trim() || undefined,
         repository_url: repoUrl.trim() || undefined,
         source_type: sourceType,
+        technologies: selectedTechs.length > 0 ? selectedTechs : undefined,
       });
 
-      setStatusMessage(`Project "${name}" created successfully. You can now analyze it to extract demonstrated skills.`);
+      setStatusMessage(`Project "${name}" created successfully. You can now analyze it to extract verified technical skills.`);
       setName("");
       setDescription("");
       setRepoUrl("");
+      setSelectedTechs([]);
       setShowAdd(false);
       loadProjects();
     } catch (err: unknown) {
@@ -97,6 +106,7 @@ export default function ProjectsView() {
     setEditName(p.name);
     setEditDescription(p.description || "");
     setEditRepoUrl(p.repository_url || "");
+    setEditTechs(p.technologies || []);
     setErrorMessage(null);
     setStatusMessage(null);
   };
@@ -113,6 +123,7 @@ export default function ProjectsView() {
         name: editName.trim(),
         description: editDescription.trim() || undefined,
         repository_url: editRepoUrl.trim() || undefined,
+        technologies: editTechs,
       });
 
       setStatusMessage(`Project "${updated.name}" updated successfully.`);
@@ -136,7 +147,7 @@ export default function ProjectsView() {
 
     try {
       const analysis = await projectsApi.analyzeProject(projectId);
-      setStatusMessage("Project analysis completed successfully. Demonstrated technical skills have been added to your profile.");
+      setStatusMessage("Project analysis completed! Deep repository inspection parsed architecture, features, and verified skills into your profile.");
       setProjects((prev) =>
         prev.map((p) => (p.id === projectId ? { ...p, latest_analysis: analysis } : p))
       );
@@ -212,7 +223,7 @@ export default function ProjectsView() {
         <div>
           <h2 style={{ fontSize: 18, margin: 0 }}>Project Evidence & Intelligence</h2>
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            The work behind your story. Connect repositories and manual descriptions to demonstrate practical capability.
+            The work behind your story. Connect repositories and manual descriptions for deep code & architecture inspection.
           </p>
         </div>
         <button onClick={() => setShowAdd(!showAdd)} className="btn btn-primary" style={{ fontSize: 12 }}>
@@ -220,7 +231,7 @@ export default function ProjectsView() {
         </button>
       </div>
 
-      {/* Edit Project Modal / Section */}
+      {/* Edit Project Section */}
       {editingProject && (
         <section className="card card-pad" style={{ marginBottom: 24, border: "2px solid var(--accent)", background: "var(--surface)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -255,6 +266,16 @@ export default function ProjectsView() {
                 />
               </div>
             </div>
+
+            <div style={{ marginTop: 12 }}>
+              <TechMultiSelect
+                selected={editTechs}
+                onChange={setEditTechs}
+                label="Key Technologies & Frameworks"
+                placeholder="Select or search technologies used in this project..."
+              />
+            </div>
+
             <div className="field" style={{ marginTop: 12 }}>
               <label htmlFor="editPDesc">Project Description & Architecture</label>
               <textarea
@@ -265,6 +286,7 @@ export default function ProjectsView() {
                 onChange={(e) => setEditDescription(e.target.value)}
               />
             </div>
+
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
               <button type="submit" className="btn btn-primary" disabled={updating}>
                 {updating ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save Changes
@@ -312,25 +334,37 @@ export default function ProjectsView() {
             </div>
 
             <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="pDesc">Project Description & Architecture</label>
+              <label htmlFor="pRepo">GitHub Repository URL</label>
+              <input
+                id="pRepo"
+                className="input"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                placeholder="https://github.com/kaushalkumar-e01/Kynetic"
+              />
+              <span className="muted" style={{ fontSize: 10, marginTop: 4, display: "block" }}>
+                Our deep code inspector parses package.json, requirements.txt, Dockerfiles, and workflows directly to verify implementation.
+              </span>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <TechMultiSelect
+                selected={selectedTechs}
+                onChange={setSelectedTechs}
+                label="Key Technologies & Frameworks"
+                placeholder="Choose technologies (e.g. FastAPI, Next.js, Docker, PostgreSQL)..."
+              />
+            </div>
+
+            <div className="field" style={{ marginTop: 12 }}>
+              <label htmlFor="pDesc">Project Description & Architecture (Optional)</label>
               <textarea
                 id="pDesc"
                 className="input"
                 style={{ minHeight: 60, resize: "vertical" }}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What does this project do? Mention technologies used (e.g. Python, FastAPI, Docker, PostgreSQL, React)..."
-              />
-            </div>
-
-            <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="pRepo">Repository or Demo URL (Optional)</label>
-              <input
-                id="pRepo"
-                className="input"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                placeholder="https://github.com/username/project-repo"
+                placeholder="What does this project do? Mention architectural goals, microservices, or specific features..."
               />
             </div>
 
@@ -359,10 +393,13 @@ export default function ProjectsView() {
           {projects.map((p) => {
             const isAnalyzing = analyzingId === p.id;
             const analysis = p.latest_analysis;
-            const techStack = analysis?.detected_technologies || [];
+            const techStack = analysis?.detected_technologies || p.technologies || [];
             const demonstratedSkills = analysis?.demonstrated_skills || [];
             const missingReqs = analysis?.missing_requirements || [];
             const recommendations = analysis?.recommendations || [];
+            const majorFeatures = analysis?.major_features || [];
+            const strengths = analysis?.technical_strengths || [];
+            const inspectedFiles = analysis?.inspected_files || [];
 
             return (
               <div className="card card-pad" key={p.id}>
@@ -384,11 +421,11 @@ export default function ProjectsView() {
                     >
                       {isAnalyzing ? (
                         <>
-                          <Loader2 size={12} className="animate-spin" /> Analyzing...
+                          <Loader2 size={12} className="animate-spin" /> Inspecting Code...
                         </>
                       ) : (
                         <>
-                          <Sparkles size={12} /> {analysis ? "Re-analyze" : "Analyze"}
+                          <Sparkles size={12} /> {analysis ? "Re-inspect" : "Inspect Code"}
                         </>
                       )}
                     </button>
@@ -416,7 +453,8 @@ export default function ProjectsView() {
                 </p>
 
                 {p.repository_url && (
-                  <div style={{ fontSize: 11, marginTop: 8 }}>
+                  <div style={{ fontSize: 11, marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Code2 size={12} color="var(--accent)" />
                     <a
                       href={p.repository_url}
                       target="_blank"
@@ -446,6 +484,26 @@ export default function ProjectsView() {
                       <span className="muted" style={{ fontSize: 10 }}>Status: {analysis.status}</span>
                     </div>
 
+                    {/* Inspected Manifests indicator */}
+                    {inspectedFiles.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "4px 8px",
+                          background: "rgba(0, 209, 178, 0.08)",
+                          borderRadius: 6,
+                          fontSize: 10,
+                          color: "var(--teal)",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <FileCode size={12} />
+                        <span>Inspected {inspectedFiles.length} repository files: {inspectedFiles.slice(0, 4).join(", ")}{inspectedFiles.length > 4 ? ` +${inspectedFiles.length - 4} more` : ""}</span>
+                      </div>
+                    )}
+
                     {/* Detected Tech */}
                     {techStack.length > 0 && (
                       <div style={{ marginBottom: 10 }}>
@@ -469,11 +527,46 @@ export default function ProjectsView() {
                       </div>
                     )}
 
+                    {/* Architecture Summary */}
+                    {analysis.architecture_summary && (
+                      <p className="muted" style={{ fontSize: 11, lineHeight: 1.4, marginBottom: 10 }}>
+                        {analysis.architecture_summary}
+                      </p>
+                    )}
+
+                    {/* Major Features */}
+                    {majorFeatures.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                          <CheckCircle2 size={11} color="var(--teal)" /> Key Identified Features:
+                        </div>
+                        <ul style={{ paddingLeft: 14, fontSize: 10, lineHeight: 1.4, margin: 0, color: "var(--text)" }}>
+                          {majorFeatures.map((feat, i) => (
+                            <li key={i}>{feat}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Technical Strengths */}
+                    {strengths.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--teal)", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                          <ShieldCheck size={11} /> Technical Strengths:
+                        </div>
+                        <ul style={{ paddingLeft: 14, fontSize: 10, lineHeight: 1.4, margin: 0, color: "var(--text)" }}>
+                          {strengths.map((str, i) => (
+                            <li key={i}>{str}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {/* Demonstrated Skills */}
                     {demonstratedSkills.length > 0 && (
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                          <Wrench size={11} color="var(--accent)" /> Demonstrated Skills ({demonstratedSkills.length}):
+                          <Wrench size={11} color="var(--accent)" /> Demonstrated Verified Skills ({demonstratedSkills.length}):
                         </div>
                         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                           {demonstratedSkills.map((sk, idx) => (
@@ -495,18 +588,11 @@ export default function ProjectsView() {
                       </div>
                     )}
 
-                    {/* Architecture Summary */}
-                    {analysis.architecture_summary && (
-                      <p className="muted" style={{ fontSize: 11, lineHeight: 1.4, marginBottom: 8 }}>
-                        {analysis.architecture_summary}
-                      </p>
-                    )}
-
                     {/* Recommendations */}
                     {recommendations.length > 0 && (
                       <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                          <Lightbulb size={11} /> Recommendations for Improvement:
+                          <Lightbulb size={11} /> Targeted Architecture Recommendations:
                         </div>
                         <ul style={{ paddingLeft: 14, fontSize: 10, lineHeight: 1.4, margin: 0, color: "var(--muted)" }}>
                           {recommendations.map((rec, i) => (
@@ -520,7 +606,7 @@ export default function ProjectsView() {
                     {missingReqs.length > 0 && (
                       <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: "#ff8787", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                          <ListChecks size={11} /> Requirements to Add:
+                          <ListChecks size={11} /> Production Gaps to Address:
                         </div>
                         <ul style={{ paddingLeft: 14, fontSize: 10, lineHeight: 1.4, margin: 0, color: "var(--muted)" }}>
                           {missingReqs.map((req, i) => (

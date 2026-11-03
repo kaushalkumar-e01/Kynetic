@@ -9,12 +9,15 @@ import {
   CheckCircle2,
   Circle,
   ExternalLink,
+  ListChecks,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { roadmapsApi } from "@/lib/api";
 import type { RoadmapResponse } from "@/types";
+import TechMultiSelect from "@/components/ui/TechMultiSelect";
 
 export default function RoadmapsView() {
   const [roadmaps, setRoadmaps] = useState<RoadmapResponse[]>([]);
@@ -26,7 +29,7 @@ export default function RoadmapsView() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetSkills, setTargetSkills] = useState("");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
   const loadRoadmaps = () => {
     setLoading(true);
@@ -55,21 +58,16 @@ export default function RoadmapsView() {
     setStatusMessage(null);
 
     try {
-      const skills = targetSkills
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
       await roadmapsApi.createRoadmap({
         title: title.trim(),
         description: description.trim() || undefined,
-        target_skills: skills.length > 0 ? skills : undefined,
+        target_skills: selectedSkills.length > 0 ? selectedSkills : undefined,
       });
 
-      setStatusMessage("Learning roadmap and sequenced milestones generated successfully.");
+      setStatusMessage("Personalized capability roadmap and milestone curriculum generated successfully.");
       setTitle("");
       setDescription("");
-      setTargetSkills("");
+      setSelectedSkills([]);
       setShowGen(false);
       loadRoadmaps();
     } catch (err: unknown) {
@@ -172,43 +170,41 @@ export default function RoadmapsView() {
           </div>
           <form onSubmit={handleGenerate}>
             <div className="field">
-              <label htmlFor="rmTitle">Roadmap Title</label>
+              <label htmlFor="rmTitle">Roadmap Title / Career Track</label>
               <input
                 id="rmTitle"
                 className="input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Backend Platform Engineering Mastery"
+                placeholder="e.g. Backend Platform Engineering or Frontend Next.js Mastery"
                 required
               />
             </div>
 
+            <div style={{ marginTop: 12 }}>
+              <TechMultiSelect
+                selected={selectedSkills}
+                onChange={setSelectedSkills}
+                label="Target Skills & Technologies"
+                placeholder="Choose target skills (or leave blank for automatic role curriculum)..."
+              />
+            </div>
+
             <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="rmDesc">Description & Scope</label>
+              <label htmlFor="rmDesc">Description & Scope (Optional)</label>
               <textarea
                 id="rmDesc"
                 className="input"
                 style={{ minHeight: 60, resize: "vertical" }}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Target outcomes and milestone focus..."
-              />
-            </div>
-
-            <div className="field" style={{ marginTop: 12 }}>
-              <label htmlFor="rmSkills">Target Skills (comma-separated, e.g. Python, FastAPI, Docker, PostgreSQL)</label>
-              <input
-                id="rmSkills"
-                className="input"
-                value={targetSkills}
-                onChange={(e) => setTargetSkills(e.target.value)}
-                placeholder="e.g. Python, FastAPI, Docker, PostgreSQL"
+                placeholder="Target outcomes, career goals, or milestone focus..."
               />
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ marginTop: 16 }} disabled={generating}>
-              {generating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-              Generate Roadmap & Milestones
+              {generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              Generate Roadmap & Curriculum
             </button>
           </form>
         </section>
@@ -278,10 +274,16 @@ export default function RoadmapsView() {
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
                   Progression Milestones ({r.milestones?.length || 0}):
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {(r.milestones || []).map((ms) => {
                     const done = ms.status === "completed";
-                    const resources = (ms.resources || []) as Array<{ title?: string; url?: string; action?: string }>;
+                    const resources = (ms.resources || []) as Array<{
+                      title?: string;
+                      url?: string;
+                      action?: string;
+                      objectives?: string[];
+                      note?: string;
+                    }>;
 
                     return (
                       <div
@@ -290,7 +292,7 @@ export default function RoadmapsView() {
                           display: "flex",
                           flexDirection: "column",
                           gap: 6,
-                          padding: "10px 12px",
+                          padding: "12px 14px",
                           borderRadius: 8,
                           background: done ? "rgba(0, 209, 178, 0.06)" : "var(--surface-2)",
                           border: "1px solid var(--line)",
@@ -309,7 +311,7 @@ export default function RoadmapsView() {
                             }}
                             title={done ? "Mark pending" : "Mark completed"}
                           >
-                            {done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                            {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                           </button>
                           <div style={{ flex: 1 }}>
                             <div
@@ -323,7 +325,7 @@ export default function RoadmapsView() {
                               {ms.title}
                             </div>
                             {ms.description && (
-                              <p className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                              <p className="muted" style={{ fontSize: 11, marginTop: 3 }}>
                                 {ms.description}
                               </p>
                             )}
@@ -340,34 +342,61 @@ export default function RoadmapsView() {
                           </span>
                         </div>
 
+                        {/* Learning objectives if available */}
+                        {resources.some((res) => res.objectives && res.objectives.length > 0) && (
+                          <div style={{ paddingLeft: 30, marginTop: 4 }}>
+                            {resources
+                              .filter((res) => res.objectives && res.objectives.length > 0)
+                              .map((res, i) => (
+                                <div key={i}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--teal)", marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                                    <ListChecks size={11} /> {res.title}:
+                                  </div>
+                                  <ul style={{ paddingLeft: 14, fontSize: 10, margin: "2px 0 6px", color: "var(--muted)", lineHeight: 1.4 }}>
+                                    {res.objectives!.map((obj, oi) => (
+                                      <li key={oi}>{obj}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+
                         {/* Attached Learning Resources */}
                         {resources.length > 0 && (
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 28, marginTop: 2 }}>
-                            {resources.map((res, i) => (
-                              <span
-                                key={i}
-                                style={{
-                                  fontSize: 10,
-                                  color: "var(--accent)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  background: "var(--surface)",
-                                  padding: "2px 6px",
-                                  borderRadius: 4,
-                                  border: "1px solid var(--line)",
-                                }}
-                              >
-                                <BookOpen size={10} />
-                                {res.url ? (
-                                  <a href={res.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 2 }}>
-                                    {res.title} <ExternalLink size={9} />
-                                  </a>
-                                ) : (
-                                  <span>{res.title}</span>
-                                )}
-                              </span>
-                            ))}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingLeft: 30, marginTop: 4 }}>
+                            {resources
+                              .filter((res) => res.url || res.note)
+                              .map((res, i) => (
+                                <span
+                                  key={i}
+                                  style={{
+                                    fontSize: 10,
+                                    color: "var(--accent)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    background: "var(--surface)",
+                                    padding: "2px 8px",
+                                    borderRadius: 4,
+                                    border: "1px solid var(--line)",
+                                  }}
+                                >
+                                  <BookOpen size={10} />
+                                  {res.url ? (
+                                    <a
+                                      href={res.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ color: "var(--accent)", display: "flex", alignItems: "center", gap: 2 }}
+                                    >
+                                      {res.title} <ExternalLink size={9} />
+                                    </a>
+                                  ) : (
+                                    <span>{res.title}: {res.note}</span>
+                                  )}
+                                </span>
+                              ))}
                           </div>
                         )}
                       </div>

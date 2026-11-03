@@ -5,6 +5,7 @@ import { AlertCircle, Check, Loader2, Plus, ShieldCheck, Zap } from "lucide-reac
 import { skillsApi } from "@/lib/api";
 import type { EvidenceRecordResponse, UserCapabilityResponse } from "@/types";
 import { EvidenceBadge, type EvidenceKind } from "@/components/AppShell";
+import { ALL_TECHNOLOGIES } from "@/components/ui/technologyCatalog";
 
 export default function CapabilitiesView() {
   const [capabilities, setCapabilities] = useState<UserCapabilityResponse[]>([]);
@@ -145,11 +146,17 @@ export default function CapabilitiesView() {
                 <input
                   id="skillName"
                   className="input"
+                  list="technology-catalog-options"
                   value={skillName}
                   onChange={(e) => setSkillName(e.target.value)}
                   placeholder="e.g. Docker, PostgreSQL, React Native"
                   required
                 />
+                <datalist id="technology-catalog-options">
+                  {ALL_TECHNOLOGIES.map((tech: string) => (
+                    <option key={tech} value={tech} />
+                  ))}
+                </datalist>
               </div>
               <div className="field">
                 <label htmlFor="category">Category</label>

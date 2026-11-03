@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { goalsApi, roadmapsApi } from "@/lib/api";
 import type { GoalResponse } from "@/types";
+import RoleSelect from "@/components/ui/RoleSelect";
 
 export default function GoalsView() {
   const [goals, setGoals] = useState<GoalResponse[]>([]);
@@ -318,17 +319,13 @@ export default function GoalsView() {
           </div>
           <form onSubmit={handleCreate}>
             <div className="grid-2">
-              <div className="field">
-                <label htmlFor="goalTitle">Goal Title</label>
-                <input
-                  id="goalTitle"
-                  className="input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Target Full Stack Developer Role"
-                  required
-                />
-              </div>
+              <RoleSelect
+                value={title}
+                onChange={setTitle}
+                label="Target Career Goal / Role"
+                placeholder="Select a career track or enter custom role..."
+                required
+              />
               <div className="field">
                 <label htmlFor="goalType">Goal Type</label>
                 <select
