@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import computed_field
+from pydantic import computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: Optional[str] = None
     GITHUB_REDIRECT_URI: str = "http://localhost:8000/api/v1/integrations/github/callback"
 
+    @model_validator(mode="after")
+    def validate_production_secret_key(self) -> "Settings":
+        default_insecure = "insecure-development-secret-key-replace-in-production"
+        if self.APP_ENV not in ("development", "test") and self.SECRET_KEY == default_insecure:
+            raise ValueError(
+                f"Startup check failed: SECRET_KEY must be changed from default value when APP_ENV is '{self.APP_ENV}'."
+            )
+        return self
+
     @computed_field
     @property
     def cors_origins_list(self) -> List[str]:
@@ -60,4 +69,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,8 +15,17 @@ from app.core.exception_handlers import (
 )
 from app.api.v1.endpoints.health import get_health
 
+logger = logging.getLogger("kynetic.startup")
+
 
 def create_app() -> FastAPI:
+    # Fail fast if APP_ENV is not development/test and SECRET_KEY is still insecure default
+    default_insecure = "insecure-development-secret-key-replace-in-production"
+    if settings.APP_ENV not in ("development", "test") and settings.SECRET_KEY == default_insecure:
+        error_msg = f"FATAL: Insecure default SECRET_KEY cannot be used when APP_ENV is '{settings.APP_ENV}'."
+        logger.critical(error_msg)
+        raise RuntimeError(error_msg)
+
     app = FastAPI(
         title=f"{settings.APP_NAME} API",
         description="Backend API service for Kynetic — Knowledge in Motion",
@@ -59,4 +69,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

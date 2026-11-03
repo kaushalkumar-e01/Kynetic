@@ -16,7 +16,9 @@ def test_health_endpoint_logic():
 
 
 def test_app_routes_registered():
-    route_paths = [route.path for route in app.routes]
+    direct_paths = [getattr(route, "path", "") for route in app.routes if hasattr(route, "path")]
+    openapi_paths = list(app.openapi().get("paths", {}).keys())
+    route_paths = set(direct_paths + openapi_paths)
     assert "/api/v1/health" in route_paths
     assert "/health" in route_paths
     assert "/" in route_paths
