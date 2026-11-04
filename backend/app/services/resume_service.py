@@ -36,7 +36,11 @@ class ResumeService:
             db.add(analysis)
 
         analysis.status = "completed"
-        analysis.extracted_profile = analysis_data.get("extracted_profile", {})
+        profile_data = dict(analysis_data.get("extracted_profile", {}) or {})
+        claimed_skills = analysis_data.get("claimed_skills", [])
+        if "claimed_skills" not in profile_data:
+            profile_data["claimed_skills"] = claimed_skills
+        analysis.extracted_profile = profile_data
         analysis.strengths = analysis_data.get("strengths", [])
         analysis.suggestions = analysis_data.get("suggestions", [])
         analysis.model_metadata = analysis_data.get("model_metadata", {})

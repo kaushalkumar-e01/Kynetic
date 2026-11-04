@@ -29,12 +29,17 @@ def create_project(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    access_metadata = {}
+    if payload.technologies:
+        access_metadata["technologies"] = payload.technologies
+
     project = Project(
         user_id=current_user.id,
         name=payload.name,
         description=payload.description,
         source_type=payload.source_type,
         repository_url=payload.repository_url,
+        access_metadata=access_metadata,
     )
     db.add(project)
     db.commit()
@@ -114,6 +119,12 @@ def update_project(
         raise NotFoundException("Project not found or access denied.")
 
     update_dict = payload.model_dump(exclude_unset=True)
+    if "technologies" in update_dict:
+        techs = update_dict.pop("technologies")
+        meta = dict(project.access_metadata or {})
+        meta["technologies"] = techs
+        project.access_metadata = meta
+
     for field, val in update_dict.items():
         setattr(project, field, val)
 
@@ -196,4 +207,3 @@ def get_project_analysis_by_id(
         raise NotFoundException("Project analysis not found or access denied.")
 
     return ProjectAnalysisResponse.model_validate(analysis)
-

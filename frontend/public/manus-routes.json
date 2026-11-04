@@ -1,0 +1,33 @@
+{
+  "routes": [
+    { "path": "/", "title": "Kynetic — Knowledge in Motion" },
+    { "path": "/login", "title": "Log in" },
+    { "path": "/register", "title": "Create account" },
+    { "path": "/dashboard", "title": "Dashboard" },
+    { "path": "/resume", "title": "Resume evidence" },
+    { "path": "/resume/:id", "title": "Resume detail" },
+    { "path": "/capabilities", "title": "Capabilities" },
+    { "path": "/capabilities/:skillId", "title": "Capability detail" },
+    { "path": "/assessments", "title": "Assessments" },
+    { "path": "/assessments/new", "title": "New assessment" },
+    { "path": "/assessments/:id", "title": "Live assessment" },
+    { "path": "/assessments/:id/results", "title": "Assessment results" },
+    { "path": "/assessments/history", "title": "Assessment history" },
+    { "path": "/projects", "title": "Projects" },
+    { "path": "/projects/new", "title": "New project" },
+    { "path": "/projects/:id", "title": "Project detail" },
+    { "path": "/projects/:id/analysis/:analysisId", "title": "Project analysis" },
+    { "path": "/integrations", "title": "Integrations" },
+    { "path": "/goals", "title": "Goals" },
+    { "path": "/goals/:id", "title": "Goal detail" },
+    { "path": "/placement", "title": "Placement matches" },
+    { "path": "/placement/:matchId", "title": "Placement match" },
+    { "path": "/roadmaps", "title": "Roadmaps" },
+    { "path": "/roadmaps/:id", "title": "Roadmap detail" },
+    { "path": "/progress", "title": "Progress analytics" },
+    { "path": "/assistant", "title": "Kynetic assistant" },
+    { "path": "/profile", "title": "Profile" },
+    { "path": "/settings", "title": "Settings" },
+    { "path": "/design-system", "title": "Design system" }
+  ]
+}

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import computed_field
+from pydantic import computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +27,18 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Optional[str] = None
     LLM_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = None
     LLM_MODEL: Optional[str] = "gemini-1.5-flash"
+
+    @computed_field
+    @property
+    def effective_gemini_api_key(self) -> Optional[str]:
+        return self.GEMINI_API_KEY or self.LLM_API_KEY
+
+    @computed_field
+    @property
+    def effective_gemini_model(self) -> str:
+        return self.GEMINI_MODEL or self.LLM_MODEL or "gemini-1.5-flash"
 
     STORAGE_PROVIDER: str = "local"
     STORAGE_LOCAL_DIR: str = "./uploads"
@@ -35,6 +46,15 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: Optional[str] = None
     GITHUB_CLIENT_SECRET: Optional[str] = None
     GITHUB_REDIRECT_URI: str = "http://localhost:8000/api/v1/integrations/github/callback"
+
+    @model_validator(mode="after")
+    def validate_production_secret_key(self) -> "Settings":
+        default_insecure = "insecure-development-secret-key-replace-in-production"
+        if self.APP_ENV not in ("development", "test") and self.SECRET_KEY == default_insecure:
+            raise ValueError(
+                f"Startup check failed: SECRET_KEY must be changed from default value when APP_ENV is '{self.APP_ENV}'."
+            )
+        return self
 
     @computed_field
     @property
@@ -60,4 +80,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

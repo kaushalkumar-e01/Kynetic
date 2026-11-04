@@ -1,3 +1,4 @@
+import pytest
 from app.core.errors import (
     NotFoundException,
     UnauthorizedException,
@@ -6,6 +7,7 @@ from app.core.errors import (
     ValidationException,
     StandardErrorResponse,
 )
+from app.core.config import Settings
 
 
 def test_app_exceptions():
@@ -45,3 +47,11 @@ def test_standard_error_schema():
     assert obj.error.code == "VALIDATION_ERROR"
     assert obj.error.message == "The request could not be processed."
     assert len(obj.error.details) == 1
+
+
+def test_production_secret_key_validation():
+    with pytest.raises(ValueError, match="Startup check failed: SECRET_KEY must be changed"):
+        Settings(
+            APP_ENV="production",
+            SECRET_KEY="insecure-development-secret-key-replace-in-production",
+        )
