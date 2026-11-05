@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundException
 from app.models.project import Project, ProjectAnalysis, ConnectedAccount
 from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.services.capability_service import recalculate_user_capability
 from app.models.activity import UserActivity
 from app.services.repo_inspector import repo_inspector
 
@@ -175,23 +176,8 @@ class ProjectService:
             )
             db.add(evidence)
 
-            capability = db.query(UserCapability).filter_by(user_id=user_id, skill_id=skill.id).first()
-            if not capability:
-                capability = UserCapability(
-                    user_id=user_id,
-                    skill_id=skill.id,
-                    estimated_band=target_band,
-                    score=target_score,
-                    confidence=evidence_confidence,
-                    evidence_count=1,
-                )
-                db.add(capability)
-            else:
-                capability.evidence_count += 1
-                capability.score = round(min(100.0, max(capability.score, target_score)), 1)
-                capability.confidence = min(0.95, capability.confidence + 0.05)
-                if is_code_verified and capability.estimated_band in ["unverified", "claimed"]:
-                    capability.estimated_band = "foundational"
+            # Recalculate user capability with practical project evidence
+            recalculate_user_capability(user_id=user_id, skill_id=skill.id, db=db)
 
         # Audit activity
         activity = UserActivity(

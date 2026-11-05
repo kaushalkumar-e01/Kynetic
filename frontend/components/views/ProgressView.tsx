@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BarChart3, Check, FileText, GitBranch, Loader2 } from "lucide-react";
 import { workspaceApi, skillsApi } from "@/lib/api";
+import { formatActivityDateTime, formatFullDateTime } from "@/lib/utils/date";
 import type { ActivityResponse, UserCapabilityResponse } from "@/types";
 
 export default function ProgressView() {
@@ -102,8 +103,8 @@ export default function ProgressView() {
                           : "Recorded workspace event"}
                       </div>
                     </div>
-                    <div className="activity-time">
-                      {new Date(item.created_at).toLocaleDateString([], { month: "short", day: "numeric" })}
+                    <div className="activity-time" title={formatFullDateTime(item.created_at)}>
+                      {formatActivityDateTime(item.created_at)}
                     </div>
                   </div>
                 ))}

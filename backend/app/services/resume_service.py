@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundException
 from app.models.resume import Resume, ResumeAnalysis
 from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.services.capability_service import recalculate_user_capability
 from app.models.activity import UserActivity
 from app.services.storage import storage_service
 from app.services.resume_parser import extract_text_from_pdf
@@ -78,25 +79,8 @@ class ResumeService:
             )
             db.add(evidence)
 
-            # Update or create user capability
-            capability = (
-                db.query(UserCapability)
-                .filter(UserCapability.user_id == user_id, UserCapability.skill_id == skill.id)
-                .first()
-            )
-            if not capability:
-                capability = UserCapability(
-                    user_id=user_id,
-                    skill_id=skill.id,
-                    estimated_band="claimed",
-                    score=50.0,
-                    confidence=0.5,
-                    evidence_count=1,
-                    last_evaluated_at=datetime.now(timezone.utc),
-                )
-                db.add(capability)
-            else:
-                capability.evidence_count += 1
+            # Recalculate user capability based on evidence (claims start at score 0.0)
+            recalculate_user_capability(user_id=user_id, skill_id=skill.id, db=db)
 
         # Audit activity
         activity = UserActivity(

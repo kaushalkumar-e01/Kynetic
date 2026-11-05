@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.assessment import AssessmentTopic, Question, Assessment, AssessmentAttempt
 from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.services.capability_service import recalculate_user_capability
 from app.services.sandbox import sandbox
 
 
@@ -288,8 +289,10 @@ class AssessmentService:
     @staticmethod
     def _record_assessment_evidence(user_id: str, question: Question, is_correct: bool, score: float, db: Session):
         topic_name = question.topic.name if question.topic else "General"
-        # Find skill matching topic name
-        skill = db.query(Skill).filter(Skill.canonical_name.ilike(f"%{topic_name.split()[0]}%")).first()
+        # Match skill accurately (first exact, then prefix match)
+        skill = db.query(Skill).filter(Skill.canonical_name.ilike(topic_name)).first()
+        if not skill:
+            skill = db.query(Skill).filter(Skill.canonical_name.ilike(f"%{topic_name.split()[0]}%")).first()
         if not skill:
             skill = Skill(canonical_name=topic_name, category="concept")
             db.add(skill)
@@ -306,31 +309,10 @@ class AssessmentService:
             quality_metadata={"difficulty": question.difficulty, "is_correct": is_correct, "score": score},
         )
         db.add(evidence)
+        db.flush()
 
-        # Update Capability
-        capability = db.query(UserCapability).filter(UserCapability.user_id == user_id, UserCapability.skill_id == skill.id).first()
-        if not capability:
-            band = "proficient" if score >= 80 else ("foundational" if score >= 40 else "developing")
-            capability = UserCapability(
-                user_id=user_id,
-                skill_id=skill.id,
-                estimated_band=band,
-                score=score,
-                confidence=0.8,
-                evidence_count=1,
-            )
-            db.add(capability)
-        else:
-            # Running weighted score calculation
-            capability.score = round((capability.score * capability.evidence_count + score) / (capability.evidence_count + 1), 1)
-            capability.evidence_count += 1
-            capability.confidence = min(0.95, capability.confidence + 0.05)
-            if capability.score >= 80:
-                capability.estimated_band = "proficient"
-            elif capability.score >= 50:
-                capability.estimated_band = "foundational"
-            else:
-                capability.estimated_band = "developing"
+        # Recalculate Capability using principled evidence-based scoring
+        recalculate_user_capability(user_id=user_id, skill_id=skill.id, db=db)
 
 
 assessment_service = AssessmentService()

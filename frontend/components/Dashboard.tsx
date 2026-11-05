@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, Check, FileText, GitBranch, Plus, ShieldCheck, Loader2 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { workspaceApi, skillsApi } from "@/lib/api";
+import { formatActivityDateTime, formatFullDateTime } from "@/lib/utils/date";
 import type { ActivityResponse, UserCapabilityResponse, WorkspaceSummaryResponse } from "@/types";
 import { AppShell, PageHeading } from "@/components/AppShell";
 
@@ -54,7 +55,7 @@ export default function Dashboard() {
   const readinessScore = Math.min(
     95,
     Math.round(
-      capabilities.reduce((acc, c) => acc + (c.score || 50), 0) / (capabilities.length || 1)
+      capabilities.reduce((acc, c) => acc + (c.score ?? 0), 0) / (capabilities.length || 1)
     )
   );
 
@@ -239,8 +240,8 @@ export default function Dashboard() {
                             : "Recorded workspace event"}
                         </div>
                       </div>
-                      <div className="activity-time">
-                        {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      <div className="activity-time" title={formatFullDateTime(item.created_at)}>
+                        {formatActivityDateTime(item.created_at)}
                       </div>
                     </div>
                   ))

@@ -83,11 +83,11 @@ def test_resume_ai_analysis_and_skill_ingestion(db_session, monkeypatch):
     evidence = db_session.query(EvidenceRecord).filter_by(user_id=user.id, source_type="resume").all()
     assert len(evidence) >= 3  # Python, FastAPI, React, etc.
 
-    # Verify user capabilities created with band='claimed' and confidence=0.5
+    # Verify user capabilities created with band='claimed' and score=0.0
     capabilities = db_session.query(UserCapability).filter_by(user_id=user.id).all()
     assert len(capabilities) >= 3
     assert all(c.estimated_band == "claimed" for c in capabilities)
-    assert all(c.confidence == 0.5 for c in capabilities)
+    assert all(c.score == 0.0 for c in capabilities)
 
 
 def test_resume_deletion(db_session):

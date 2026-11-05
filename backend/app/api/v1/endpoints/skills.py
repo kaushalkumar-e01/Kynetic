@@ -9,6 +9,7 @@ from app.core.errors import NotFoundException
 from app.models.user import User
 from app.models.skill import Skill, EvidenceRecord, UserCapability
 from app.models.activity import UserActivity
+from app.services.capability_service import recalculate_user_capability
 from app.schemas.skill import (
     SkillResponse,
     EvidenceRecordResponse,
@@ -125,26 +126,8 @@ def add_user_evidence(
     )
     db.add(evidence)
 
-    # Update or add capability
-    capability = (
-        db.query(UserCapability)
-        .filter(UserCapability.user_id == current_user.id, UserCapability.skill_id == skill.id)
-        .first()
-    )
-    if not capability:
-        capability = UserCapability(
-            user_id=current_user.id,
-            skill_id=skill.id,
-            estimated_band="claimed",
-            score=60.0,
-            confidence=payload.confidence,
-            evidence_count=1,
-            last_evaluated_at=datetime.now(timezone.utc),
-        )
-        db.add(capability)
-    else:
-        capability.evidence_count += 1
-        capability.confidence = min(0.9, capability.confidence + 0.05)
+    # Recalculate capability based on evidence (claims start at score 0.0)
+    recalculate_user_capability(user_id=current_user.id, skill_id=skill.id, db=db)
 
     activity = UserActivity(
         user_id=current_user.id,

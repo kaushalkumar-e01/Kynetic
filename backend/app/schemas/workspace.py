@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.auth import UserResponse
 from app.schemas.profile import UserProfileResponse
+from app.schemas.common import UTCDateTime
 
 
 class ActivityResponse(BaseModel):
@@ -12,7 +13,7 @@ class ActivityResponse(BaseModel):
     related_record_type: Optional[str] = None
     related_record_id: Optional[str] = None
     details: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime
+    created_at: UTCDateTime
 
     class Config:
         from_attributes = True

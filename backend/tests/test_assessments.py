@@ -72,8 +72,8 @@ def test_assessment_flow_adaptive_progression(db_session):
 
     capability = db_session.query(UserCapability).filter_by(user_id=user.id).first()
     assert capability is not None
-    assert capability.estimated_band == "proficient"
-    assert capability.score == 100.0
+    assert capability.estimated_band == "foundational"
+    assert capability.score == 10.0
 
 
 def test_coding_assessment_submission(db_session):

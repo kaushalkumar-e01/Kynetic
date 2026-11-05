@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
-    LLM_MODEL: Optional[str] = "gemini-1.5-flash"
+    LLM_MODEL: Optional[str] = "gemini-3.8-flash"
 
     @computed_field
     @property
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def effective_gemini_model(self) -> str:
-        return self.GEMINI_MODEL or self.LLM_MODEL or "gemini-1.5-flash"
+        return self.GEMINI_MODEL or self.LLM_MODEL or "gemini-3.8-flash"
 
     STORAGE_PROVIDER: str = "local"
     STORAGE_LOCAL_DIR: str = "./uploads"

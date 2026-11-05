@@ -70,8 +70,9 @@ def test_project_analysis_and_evidence_generation(db_session):
     assert len(evidence) >= 2
     assert all(e.confidence == 0.7 for e in evidence)
 
-    # Verify user capability was updated
+    # Verify user capability was updated with foundational practical evidence
     cap = db_session.query(UserCapability).filter_by(user_id=user.id).first()
     assert cap is not None
-    assert cap.score >= 65.0
+    assert cap.score > 0.0
+    assert cap.estimated_band == "foundational"
 
