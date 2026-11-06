@@ -69,3 +69,15 @@ class BaseLLMProvider(ABC):
     def generate_chat_response(self, user_prompt: str, context: Dict[str, Any]) -> str:
         """Generates an assistant response given user prompt and authorized workspace context."""
         pass
+
+    def generate_question_batch(
+        self,
+        skill_or_topic: str,
+        category: str,
+        difficulty: str,
+        question_type: str,
+        batch_size: int,
+        programming_language: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Generates a batch of technical questions with schema metadata."""
+        return []

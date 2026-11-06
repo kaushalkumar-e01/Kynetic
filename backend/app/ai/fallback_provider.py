@@ -281,11 +281,24 @@ class FallbackAIProvider(BaseLLMProvider):
                     "skill": skill,
                 },
             ]
-            if user_score >= 60.0:
+            if user_score > 0.0:
+                if user_score >= 85.0:
+                    rec_level = "Level 6 (Expert)"
+                    target_focus = "solve advanced algorithmic problems, edge-case optimizations, and production concurrency challenges to achieve 10/10 mastery."
+                elif user_score >= 65.0:
+                    rec_level = "Level 4–5 (Hard to Very Hard)"
+                    target_focus = "deepen algorithmic reasoning, dynamic programming, and systems optimization."
+                elif user_score >= 45.0:
+                    rec_level = "Level 3 (Medium)"
+                    target_focus = "reinforce data structure manipulation and multi-step algorithmic problem solving."
+                else:
+                    rec_level = "Level 1–2 (Very Easy to Easy)"
+                    target_focus = "solidify core language syntax, control structures, and basic operations."
+
                 resources.append({
-                    "type": "status_note",
-                    "title": "Baseline Verified",
-                    "note": f"Demonstrated {user_score:.0f}% proficiency in {skill}. Focus on advanced production architecture.",
+                    "type": "adaptive_recommendation",
+                    "title": f"Target Assessment Level: {rec_level}",
+                    "note": f"Current calibrated baseline: {user_score:.0f}%. Next milestone focus: {target_focus}",
                 })
 
             milestones.append({
@@ -337,3 +350,242 @@ class FallbackAIProvider(BaseLLMProvider):
         elif "resume" in prompt_lower:
             return "Your resume claims have been ingested. Make sure to ground them with technical evidence in Assessments and Projects to make them credible to recruiters."
         return f"I am your Kynetic career co-pilot. I can help analyze your capabilities, explore placement matches, and generate learning roadmaps. (Question: '{user_prompt[:50]}...')"
+
+    def generate_question_batch(
+        self,
+        skill_or_topic: str,
+        category: str,
+        difficulty: str,
+        question_type: str,
+        batch_size: int,
+        programming_language: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        results = []
+        lang = (programming_language or "python").lower()
+
+        # Natural problem templates for fallback generation
+        coding_templates = [
+            {
+                "title": "Count Positive Numbers",
+                "entry_point": "count_positives",
+                "desc": "Given a list of integers, return the count of strictly positive numbers (> 0).",
+                "examples": "Example 1:\nInput: nums = [1, -2, 3, -4, 5]\nOutput: 3\nExplanation: Positive numbers are 1, 3, and 5.\n\nExample 2:\nInput: nums = [-1, -2, -3]\nOutput: 0",
+                "constraints": ["1 <= nums.length <= 10^4", "-10^5 <= nums[i] <= 10^5"],
+                "test_cases": [
+                    {"inputs": [[1, -2, 3, -4, 5]], "expected": 3},
+                    {"inputs": [[-1, -2, -3]], "expected": 0},
+                    {"inputs": [[10, 20]], "expected": 2},
+                    {"inputs": [[]], "expected": 0},
+                ],
+                "py_ref": "def count_positives(nums):\n    return sum(1 for x in nums if x > 0)",
+                "starters": {
+                    "python": "def count_positives(nums: list[int]) -> int:\n    # Return count of positive integers\n    pass\n",
+                    "javascript": "function countPositives(nums) {\n    // Return count of positive integers\n}\n",
+                    "typescript": "function countPositives(nums: number[]): number {\n    // Return count of positive integers\n}\n",
+                    "c": "int count_positives(int* nums, int numsSize) {\n    // Return count of positive integers\n}\n",
+                    "cpp": "class Solution {\npublic:\n    int countPositives(std::vector<int>& nums) {\n        // Return count of positive integers\n    }\n};\n",
+                    "java": "class Solution {\n    public int countPositives(int[] nums) {\n        // Return count of positive integers\n    }\n}\n",
+                },
+            },
+            {
+                "title": "Find Maximum Element",
+                "entry_point": "find_maximum",
+                "desc": "Given a non-empty list of integers, return the maximum element.",
+                "examples": "Example 1:\nInput: nums = [3, 7, 2, 9, 4]\nOutput: 9\n\nExample 2:\nInput: nums = [-5, -1, -10]\nOutput: -1",
+                "constraints": ["1 <= nums.length <= 10^4", "-10^5 <= nums[i] <= 10^5"],
+                "test_cases": [
+                    {"inputs": [[3, 7, 2, 9, 4]], "expected": 9},
+                    {"inputs": [[-5, -1, -10]], "expected": -1},
+                    {"inputs": [[42]], "expected": 42},
+                ],
+                "py_ref": "def find_maximum(nums):\n    return max(nums)",
+                "starters": {
+                    "python": "def find_maximum(nums: list[int]) -> int:\n    # Return maximum element\n    pass\n",
+                    "javascript": "function findMaximum(nums) {\n    // Return maximum element\n}\n",
+                    "typescript": "function findMaximum(nums: number[]): number {\n    // Return maximum element\n}\n",
+                    "c": "int find_maximum(int* nums, int numsSize) {\n    // Return maximum element\n}\n",
+                    "cpp": "class Solution {\npublic:\n    int findMaximum(std::vector<int>& nums) {\n        // Return maximum element\n    }\n};\n",
+                    "java": "class Solution {\n    public int findMaximum(int[] nums) {\n        // Return maximum element\n    }\n}\n",
+                },
+            },
+            {
+                "title": "Sum Array Elements",
+                "entry_point": "sum_elements",
+                "desc": "Given an array of integers, compute and return the total sum of all elements.",
+                "examples": "Example 1:\nInput: nums = [1, 2, 3, 4]\nOutput: 10\n\nExample 2:\nInput: nums = [-1, 1]\nOutput: 0",
+                "constraints": ["0 <= nums.length <= 10^4", "-10^4 <= nums[i] <= 10^4"],
+                "test_cases": [
+                    {"inputs": [[1, 2, 3, 4]], "expected": 10},
+                    {"inputs": [[-1, 1]], "expected": 0},
+                    {"inputs": [[]], "expected": 0},
+                ],
+                "py_ref": "def sum_elements(nums):\n    return sum(nums)",
+                "starters": {
+                    "python": "def sum_elements(nums: list[int]) -> int:\n    # Return sum of all elements\n    pass\n",
+                    "javascript": "function sumElements(nums) {\n    // Return sum of all elements\n}\n",
+                    "typescript": "function sumElements(nums: number[]): number {\n    // Return sum of all elements\n}\n",
+                    "c": "int sum_elements(int* nums, int numsSize) {\n    // Return sum of all elements\n}\n",
+                    "cpp": "class Solution {\npublic:\n    int sumElements(std::vector<int>& nums) {\n        // Return sum of all elements\n    }\n};\n",
+                    "java": "class Solution {\n    public int sumElements(int[] nums) {\n        // Return sum of all elements\n    }\n}\n",
+                },
+            },
+            {
+                "title": "Reverse String",
+                "entry_point": "reverse_string",
+                "desc": "Given a string `s`, return the string reversed.",
+                "examples": "Example 1:\nInput: s = \"hello\"\nOutput: \"olleh\"\n\nExample 2:\nInput: s = \"Kynetic\"\nOutput: \"citenyK\"",
+                "constraints": ["0 <= s.length <= 10^4"],
+                "test_cases": [
+                    {"inputs": ["hello"], "expected": "olleh"},
+                    {"inputs": ["Kynetic"], "expected": "citenyK"},
+                    {"inputs": [""], "expected": ""},
+                ],
+                "py_ref": "def reverse_string(s):\n    return s[::-1]",
+                "starters": {
+                    "python": "def reverse_string(s: str) -> str:\n    # Return reversed string\n    pass\n",
+                    "javascript": "function reverseString(s) {\n    // Return reversed string\n}\n",
+                    "typescript": "function reverseString(s: string): string {\n    // Return reversed string\n}\n",
+                    "c": "char* reverse_string(char* s) {\n    // Return reversed string\n}\n",
+                    "cpp": "class Solution {\npublic:\n    std::string reverseString(std::string s) {\n        // Return reversed string\n    }\n};\n",
+                    "java": "class Solution {\n    public String reverseString(String s) {\n        // Return reversed string\n    }\n}\n",
+                },
+            },
+        ]
+
+        for idx in range(1, batch_size + 1):
+            if question_type == "coding":
+                tmpl = coding_templates[(idx - 1) % len(coding_templates)]
+                title = f"{tmpl['title']} (Variant {idx})" if idx > len(coding_templates) else tmpl["title"]
+                prompt = (
+                    f"### {title}\n\n"
+                    f"{tmpl['desc']}\n\n"
+                    f"{tmpl['examples']}\n\n"
+                    f"**Constraints:**\n"
+                    + "\n".join(f"- {c}" for c in tmpl["constraints"])
+                )
+                results.append({
+                    "title": title,
+                    "prompt": prompt,
+                    "subtopic": skill_or_topic,
+                    "options": [],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "entry_point": tmpl["entry_point"],
+                        "starter_codes": tmpl["starters"],
+                        "starter_code": tmpl["starters"].get(lang, tmpl["starters"]["python"]),
+                        "test_cases": tmpl["test_cases"],
+                        "reference_solution": tmpl["py_ref"],
+                        "constraints": tmpl["constraints"],
+                    },
+                })
+            elif question_type == "sql":
+                title = f"Filter High Value Products (Tier {idx})"
+                results.append({
+                    "title": title,
+                    "prompt": (
+                        f"### {title}\n\n"
+                        f"Given the `products` table containing inventory data, write an SQL query to retrieve "
+                        f"the `name` and `price` of all active products with price greater than or equal to {idx * 50}, "
+                        f"ordered by `price` descending.\n\n"
+                        f"**Schema:** `products(id INT, name TEXT, price INT, is_active INT)`"
+                    ),
+                    "subtopic": skill_or_topic,
+                    "options": [],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "schema_ddl": (
+                            f"CREATE TABLE products (id INT, name TEXT, price INT, is_active INT);\n"
+                            f"INSERT INTO products VALUES (1, 'Widget A', {idx * 50 + 20}, 1), "
+                            f"(2, 'Widget B', {idx * 50 - 10}, 1), (3, 'Widget C', {idx * 50 + 80}, 0);"
+                        ),
+                        "reference_query": f"SELECT name, price FROM products WHERE is_active = 1 AND price >= {idx * 50} ORDER BY price DESC;",
+                    },
+                })
+            elif question_type == "output_prediction":
+                target_val = (idx * 4 + 2)
+                title = f"List Comprehension Evens Output (Index {idx})"
+                code_snippet = f"nums = [x for x in range({target_val}) if x % 2 == 0]\nprint(len(nums))"
+                expected = str(target_val // 2)
+                results.append({
+                    "title": title,
+                    "prompt": f"### {title}\n\nWhat will be the stdout output of the following {lang.title()} code snippet?\n\n```python\n{code_snippet}\n```",
+                    "subtopic": skill_or_topic,
+                    "options": [expected, str(target_val), str(target_val // 2 - 1), "Error"],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "code": code_snippet,
+                        "expected_output": expected,
+                        "correct_answer": expected,
+                        "explanation": f"The range(0, {target_val}) produces {target_val} integers. Exactly {expected} of them are even numbers.",
+                    },
+                })
+            elif question_type == "debugging":
+                title = f"Concurrent Modification Defect (Scope {idx})"
+                buggy = (
+                    f"def remove_target_values(items, target):\n"
+                    f"    for i in range(len(items)):\n"
+                    f"        if items[i] == target:\n"
+                    f"            del items[i]\n"
+                    f"    return items"
+                )
+                results.append({
+                    "title": title,
+                    "prompt": (
+                        f"### {title}\n\n"
+                        f"Identify the runtime defect in the following function designed to remove matching target values from a collection:\n\n"
+                        f"```python\n{buggy}\n```"
+                    ),
+                    "subtopic": skill_or_topic,
+                    "options": [
+                        "Mutating a list while iterating over its index range causes IndexError or skips adjacent items",
+                        "Missing type annotation causes Python compiler rejection",
+                        "The del keyword cannot be applied to list indices",
+                        "Variables cannot be compared using the == equality operator in Python",
+                    ],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "buggy_code": buggy,
+                        "correct_fix": "Mutating a list while iterating over its index range causes IndexError or skips adjacent items",
+                        "explanation": "Deleting elements during range iteration shrinks the list dynamically, causing index out of range or skipping adjacent items. Use list comprehension or iterate backwards.",
+                    },
+                })
+            elif question_type == "conceptual":
+                title = f"{skill_or_topic} Architectural Principles (Tier {idx})"
+                results.append({
+                    "title": title,
+                    "prompt": (
+                        f"### {title}\n\n"
+                        f"Analyze the performance, concurrency, and memory trade-offs of {skill_or_topic}. "
+                        f"Discuss cache locality, asymptotic time complexity, and heap versus stack allocation."
+                    ),
+                    "subtopic": skill_or_topic,
+                    "options": [],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "rubric": "Addresses cache locality, heap vs stack memory allocation, and asymptotic time complexity bounds.",
+                        "key_concepts": ["cache locality", "time complexity", "memory layout", "concurrency"],
+                    },
+                })
+            else:  # multiple_choice
+                title = f"{skill_or_topic} Execution Architecture (Level {idx})"
+                results.append({
+                    "title": title,
+                    "prompt": (
+                        f"### {title}\n\n"
+                        f"What is the primary design characteristic of {skill_or_topic} regarding memory safety and execution determinism?"
+                    ),
+                    "subtopic": skill_or_topic,
+                    "options": [
+                        "Deterministic state transitions with structured lifecycle and boundary validation",
+                        "Automatic asynchronous multiprocessing across all hardware threads without locks",
+                        "Global execution of unverified binaries directly in ring 0",
+                        "Complete omission of data structure boundary validation",
+                    ],
+                    "evaluation_metadata": {
+                        "title": title,
+                        "correct_answer": "Deterministic state transitions with structured lifecycle and boundary validation",
+                        "explanation": f"Core design principle of {skill_or_topic} guarantees structured state transitions and memory boundary safety.",
+                    },
+                })
+
+        return results

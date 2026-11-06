@@ -1,14 +1,20 @@
 import ast
 import multiprocessing
+import time
 from typing import Dict, Any, List
+
+from app.services.code_evaluator import code_evaluator
 
 FORBIDDEN_MODULES = {
     "os", "sys", "subprocess", "socket", "requests", "urllib", "shutil",
     "pty", "posix", "ctypes", "pickle", "shelve", "builtins", "importlib",
+    "http", "asyncio", "multiprocessing", "threading", "signal", "inspect",
+    "gc", "socketserver", "ftplib", "telnetlib", "webbrowser",
 }
 
 FORBIDDEN_CALLS = {
     "eval", "exec", "open", "compile", "__import__", "getattr", "setattr", "delattr",
+    "globals", "locals", "vars", "breakpoint", "input", "help", "memoryview",
 }
 
 
@@ -35,24 +41,32 @@ class SecurityVisitor(ast.NodeVisitor):
             self.errors.append(f"Calling restricted built-in function '{node.func.id}' is prohibited.")
         self.generic_visit(node)
 
+    def visit_Attribute(self, node: ast.Attribute):
+        if node.attr.startswith("__") and node.attr.endswith("__"):
+            if node.attr not in ("__init__", "__iter__", "__next__", "__len__"):
+                self.errors.append(f"Direct access to dunder attribute '{node.attr}' is prohibited.")
+        self.generic_visit(node)
+
 
 def _execute_in_process(code_str: str, entry_point: str, test_cases: List[Dict[str, Any]], return_dict: dict):
     try:
-        local_scope = {}
-        # Execute code in clean restricted global environment
-        restricted_globals = {
+        import sys
+        sys.setrecursionlimit(500)  # Recursion limit to guard against infinite call stacks
+
+        exec_scope = {
             "__builtins__": {
                 "range": range, "len": len, "int": int, "float": float, "str": str,
                 "list": list, "dict": dict, "set": set, "tuple": tuple, "bool": bool,
                 "min": min, "max": max, "sum": sum, "sorted": sorted, "abs": abs,
                 "enumerate": enumerate, "zip": zip, "map": map, "filter": filter,
-                "round": round, "print": lambda *args: None,
+                "round": round, "pow": pow, "divmod": divmod, "all": all, "any": any,
+                "print": lambda *args: None,
             }
         }
 
-        exec(code_str, restricted_globals, local_scope)
+        exec(code_str, exec_scope, exec_scope)
 
-        if entry_point not in local_scope:
+        if entry_point not in exec_scope:
             return_dict["result"] = {
                 "status": "error",
                 "error_message": f"Entry point function '{entry_point}' not found in submitted code.",
@@ -62,32 +76,52 @@ def _execute_in_process(code_str: str, entry_point: str, test_cases: List[Dict[s
             }
             return
 
-        target_fn = local_scope[entry_point]
+        target_fn = exec_scope[entry_point]
         test_results = []
         passed_count = 0
+        total_time_ms = 0.0
 
         for tc in test_cases:
             inputs = tc.get("inputs", [])
             expected = tc.get("expected")
+            is_hidden = bool(tc.get("hidden") or tc.get("is_hidden"))
 
+            t0 = time.perf_counter()
             try:
                 actual = target_fn(*inputs)
+                duration_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+                total_time_ms += duration_ms
+
                 is_pass = actual == expected
                 if is_pass:
                     passed_count += 1
                 test_results.append({
-                    "inputs": inputs,
-                    "expected": expected,
-                    "actual": actual,
+                    "inputs": "[Hidden Test Case]" if is_hidden else inputs,
+                    "expected": "[Hidden Test Case]" if is_hidden else expected,
+                    "actual": ("[Hidden Output]" if is_pass else "[Hidden Output Mismatch]") if is_hidden else actual,
                     "passed": is_pass,
+                    "duration_ms": duration_ms,
+                    "is_hidden": is_hidden,
+                })
+            except RecursionError:
+                test_results.append({
+                    "inputs": "[Hidden Test Case]" if is_hidden else inputs,
+                    "expected": "[Hidden Test Case]" if is_hidden else expected,
+                    "actual": None,
+                    "error": "Maximum recursion depth exceeded (Stack Overflow Guard)",
+                    "passed": False,
+                    "duration_ms": round((time.perf_counter() - t0) * 1000.0, 3),
+                    "is_hidden": is_hidden,
                 })
             except Exception as e:
                 test_results.append({
-                    "inputs": inputs,
-                    "expected": expected,
+                    "inputs": "[Hidden Test Case]" if is_hidden else inputs,
+                    "expected": "[Hidden Test Case]" if is_hidden else expected,
                     "actual": None,
                     "error": str(e),
                     "passed": False,
+                    "duration_ms": round((time.perf_counter() - t0) * 1000.0, 3),
+                    "is_hidden": is_hidden,
                 })
 
         all_passed = (passed_count == len(test_cases))
@@ -96,6 +130,7 @@ def _execute_in_process(code_str: str, entry_point: str, test_cases: List[Dict[s
             "passed_tests": passed_count,
             "total_tests": len(test_cases),
             "test_results": test_results,
+            "total_duration_ms": round(total_time_ms, 2),
             "error_message": None if all_passed else f"Passed {passed_count}/{len(test_cases)} tests.",
         }
 
@@ -117,7 +152,18 @@ class CodeSandbox:
         test_cases: List[Dict[str, Any]],
         timeout_seconds: float = 3.0,
     ) -> Dict[str, Any]:
-        # Step 1: Static AST Security Analysis
+        if not code_str or not str(code_str).strip():
+            return {
+                "status": "error",
+                "error_message": "Empty code submission. Please provide a solution function.",
+                "passed_tests": 0,
+                "total_tests": len(test_cases) if test_cases else 0,
+                "test_results": [],
+                "quality_metrics": None,
+                "integrity_flags": [],
+            }
+
+        # Step 1: Static AST Security & Quality Analysis
         try:
             tree = ast.parse(code_str)
         except SyntaxError as e:
@@ -127,6 +173,8 @@ class CodeSandbox:
                 "passed_tests": 0,
                 "total_tests": len(test_cases),
                 "test_results": [],
+                "quality_metrics": None,
+                "integrity_flags": [],
             }
 
         visitor = SecurityVisitor()
@@ -138,10 +186,26 @@ class CodeSandbox:
                 "passed_tests": 0,
                 "total_tests": len(test_cases),
                 "test_results": [],
+                "quality_metrics": None,
+                "integrity_flags": ["Security boundary violation"],
             }
 
-        # Step 2: In-Process Sandbox Execution with timeout
-        # Using multiprocessing or thread pool to enforce execution deadline
+        quality_metrics = code_evaluator.analyze_ast(code_str, entry_point)
+
+        # Step 2: Anti-Cheating & Hardcoding Detection
+        integrity_report = code_evaluator.detect_cheating_and_hardcoding(code_str, entry_point, test_cases)
+        if integrity_report.get("cheating_detected"):
+            return {
+                "status": "cheating_detected",
+                "error_message": "; ".join(integrity_report.get("flags", ["Anti-cheating check failed."])),
+                "passed_tests": 0,
+                "total_tests": len(test_cases),
+                "test_results": [],
+                "quality_metrics": quality_metrics,
+                "integrity_flags": integrity_report.get("flags", []),
+            }
+
+        # Step 3: In-Process Sandbox Execution with timeout
         manager = multiprocessing.Manager()
         return_dict = manager.dict()
 
@@ -161,9 +225,11 @@ class CodeSandbox:
                 "passed_tests": 0,
                 "total_tests": len(test_cases),
                 "test_results": [],
+                "quality_metrics": quality_metrics,
+                "integrity_flags": integrity_report.get("flags", []),
             }
 
-        return return_dict.get("result", {
+        exec_res = return_dict.get("result", {
             "status": "error",
             "error_message": "Execution terminated unexpectedly without result.",
             "passed_tests": 0,
@@ -171,6 +237,16 @@ class CodeSandbox:
             "test_results": [],
         })
 
+        exec_res["quality_metrics"] = quality_metrics
+        exec_res["integrity_flags"] = integrity_report.get("flags", [])
+        exec_res["sandbox_metadata"] = {
+            "provider": "isolated_process_sandbox",
+            "timeout_seconds": timeout_seconds,
+            "recursion_limit": 500,
+            "network_access": "disabled",
+            "filesystem_access": "disabled",
+        }
+        return exec_res
+
 
 sandbox = CodeSandbox()
-

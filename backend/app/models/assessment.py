@@ -30,6 +30,7 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     difficulty: Mapped[str] = mapped_column(String(20), index=True, nullable=False)  # very_easy, easy, medium, hard, very_hard, expert
     difficulty_level: Mapped[int] = mapped_column(Integer, default=2, index=True, nullable=False)  # 1 to 6
     programming_language: Mapped[Optional[str]] = mapped_column(String(50), index=True, nullable=True)  # c, cpp, java, python, javascript, sql, none
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[Optional[list]] = mapped_column(JSON, default=list, nullable=True)  # List of choices for MCQ
     evaluation_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # Hidden answers, test cases, rubrics

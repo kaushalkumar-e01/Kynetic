@@ -34,8 +34,12 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
           password,
         });
       }
-      router.push("/dashboard");
-      router.refresh();
+      if (typeof window !== "undefined") {
+        window.location.href = "/dashboard";
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

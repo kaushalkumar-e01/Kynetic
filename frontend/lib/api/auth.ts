@@ -15,10 +15,18 @@ export async function register(data: UserRegisterRequest): Promise<TokenResponse
       },
     };
   }
-  return apiClient<TokenResponse>("/auth/register", {
+  const res = await apiClient<TokenResponse>("/auth/register", {
     method: "POST",
     body: data,
   });
+  if (res?.access_token && typeof window !== "undefined") {
+    try {
+      localStorage.setItem("kynetic_access_token", res.access_token);
+    } catch {
+      // Storage access guarded
+    }
+  }
+  return res;
 }
 
 export async function login(data: UserLoginRequest): Promise<TokenResponse> {
@@ -34,13 +42,28 @@ export async function login(data: UserLoginRequest): Promise<TokenResponse> {
       },
     };
   }
-  return apiClient<TokenResponse>("/auth/login", {
+  const res = await apiClient<TokenResponse>("/auth/login", {
     method: "POST",
     body: data,
   });
+  if (res?.access_token && typeof window !== "undefined") {
+    try {
+      localStorage.setItem("kynetic_access_token", res.access_token);
+    } catch {
+      // Storage access guarded
+    }
+  }
+  return res;
 }
 
 export async function logout(): Promise<{ message: string }> {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("kynetic_access_token");
+    } catch {
+      // Storage access guarded
+    }
+  }
   if (shouldUseMock("auth")) {
     return { message: "Logged out successfully (mock)." };
   }

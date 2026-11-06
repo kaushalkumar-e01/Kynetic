@@ -48,7 +48,7 @@ export default function Dashboard() {
 
   // Calculate evidence mix percentages
   const claimedCount = capabilities.filter((c) => c.estimated_band === "claimed").length;
-  const assessedCount = capabilities.filter((c) => c.estimated_band === "proficient" || c.estimated_band === "advanced").length;
+  const assessedCount = capabilities.filter((c) => c.estimated_band === "proficient" || c.estimated_band === "advanced" || c.estimated_band === "expert").length;
   const projectCount = capabilities.filter((c) => c.estimated_band === "foundational").length;
   const totalSignals = capabilities.length || 1;
 

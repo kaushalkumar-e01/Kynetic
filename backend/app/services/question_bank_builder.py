@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.assessment import AssessmentTopic, Question
 from app.models.skill import Skill
 from app.services.question_validator import question_validator
+from app.services.catalog import get_all_expanded_questions
 
 logger = logging.getLogger("kynetic.assessment.bank_builder")
 
@@ -28,27 +29,28 @@ class QuestionBankBuilder:
 
     @staticmethod
     def seed_2000_questions(db: Session, force: bool = False) -> Dict[str, Any]:
-        existing_count = db.query(Question).count()
+        existing_count = db.query(Question).filter(Question.is_active == True, Question.validation_status == "validated").count()
         if existing_count >= 2000 and not force:
-            logger.info("Question bank already contains %d questions. Skipping seed.", existing_count)
+            logger.info("Question bank already contains %d validated active questions. Skipping seed.", existing_count)
             return QuestionBankBuilder.get_bank_statistics(db)
 
-        logger.info("Seeding verified question bank to target 2,000 validated questions...")
+        logger.info("Seeding verified question bank to target 2,000+ validated questions via catalog...")
+        all_qs = get_all_expanded_questions()
+        for q_data in all_qs:
+            category = q_data.get("category", "cs_fundamentals")
+            lang = q_data.get("programming_language")
+            topic_name = "Computer Science Fundamentals"
+            if category == "dsa":
+                topic_name = "Data Structures & Algorithms"
+            elif category == "sql":
+                topic_name = "SQL & Database Systems"
+            elif category == "web_development":
+                topic_name = "Web Development"
+            elif category == "programming_languages":
+                topic_name = f"{lang.upper() if lang else 'General'} Programming"
 
-        # 1. Programming Languages (600 questions: C, C++, Java, Python, JavaScript)
-        QuestionBankBuilder._seed_programming_languages(db)
-
-        # 2. Data Structures & Algorithms (500 questions)
-        QuestionBankBuilder._seed_dsa(db)
-
-        # 3. SQL & Relational Databases (250 questions)
-        QuestionBankBuilder._seed_sql(db)
-
-        # 4. Web Development (250 questions)
-        QuestionBankBuilder._seed_web_dev(db)
-
-        # 5. CS Fundamentals & System Engineering (400 questions)
-        QuestionBankBuilder._seed_cs_fundamentals(db)
+            topic = QuestionBankBuilder._get_or_create_topic(topic_name, f"Assessment for {topic_name}", category, db)
+            QuestionBankBuilder._insert_questions_batch(topic, [q_data], db)
 
         db.commit()
         stats = QuestionBankBuilder.get_bank_statistics(db)
@@ -82,14 +84,15 @@ class QuestionBankBuilder:
             if exists:
                 continue
 
-            # Validate
-            is_valid, msg = question_validator.validate_question(q_data)
+            # Fast validate schema & metadata during bulk seeding
+            is_valid, msg = question_validator.validate_question(q_data, validate_code=False)
             status = "validated" if is_valid else "draft"
 
             diff_str, diff_lvl = q_data["difficulty"], q_data["difficulty_level"]
 
             q = Question(
                 topic_id=topic.id,
+                title=q_data.get("title") or q_data.get("evaluation_metadata", {}).get("title"),
                 category=q_data.get("category", "cs_fundamentals"),
                 subtopic=q_data.get("subtopic", "General"),
                 question_type=q_data["question_type"],

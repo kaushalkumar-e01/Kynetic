@@ -21,9 +21,12 @@ class QuestionPublicResponse(BaseModel):
     difficulty: str
     difficulty_level: int = 2
     programming_language: Optional[str] = None
+    title: Optional[str] = None
     prompt: str
     options: List[str] = []
     starter_code: Optional[str] = None
+    starter_codes: Optional[Dict[str, str]] = None
+    examples: Optional[List[Dict[str, Any]]] = None
     constraints: Optional[List[str]] = None
     sample_test_cases: Optional[List[Dict[str, Any]]] = None
     schema_ddl: Optional[str] = None
@@ -88,6 +91,10 @@ class AssessmentSummaryResultsResponse(BaseModel):
     total_questions: int
     correct_answers: int
     average_score: float
+    mastery_score: Optional[float] = None
+    mastery_band: Optional[str] = None
+    highest_tier_passed: Optional[str] = None
+    estimated_ability: Optional[float] = None
     completed_at: Optional[datetime] = None
     attempts: List[AssessmentAttemptResponse] = []
 
@@ -114,6 +121,7 @@ class AIGenerateBatchResponse(BaseModel):
     requested: int
     validated_and_saved: int
     rejected_count: int
+    duplicates_prevented: int = 0
     validation_errors: List[str] = []
     topic: str
     model_metadata: Dict[str, Any]

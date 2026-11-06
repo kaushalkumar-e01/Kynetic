@@ -45,6 +45,18 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
   const finalHeaders = new Headers(headers);
   let finalBody: BodyInit | undefined;
 
+  // Seamless cross-origin & cross-port token attachment (localhost:3000 -> localhost:8000)
+  if (typeof window !== "undefined") {
+    try {
+      const storedToken = localStorage.getItem("kynetic_access_token");
+      if (storedToken && !finalHeaders.has("Authorization")) {
+        finalHeaders.set("Authorization", `Bearer ${storedToken}`);
+      }
+    } catch {
+      // LocalStorage access guarded
+    }
+  }
+
   if (body instanceof FormData) {
     finalBody = body;
     // Let browser set multipart boundary header automatically
@@ -85,6 +97,11 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
     }
 
     if (response.status === 401 && typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("kynetic_access_token");
+      } catch {
+        // Ignored
+      }
       const currentPath = window.location.pathname;
       if (currentPath !== "/login" && currentPath !== "/register" && currentPath !== "/") {
         window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;

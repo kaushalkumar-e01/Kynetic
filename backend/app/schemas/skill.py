@@ -37,6 +37,7 @@ class UserCapabilityResponse(BaseModel):
     category: Optional[str] = None
     estimated_band: str
     score: float
+    mastery_score: Optional[float] = None
     confidence: float
     evidence_count: int
     last_evaluated_at: datetime

@@ -47,6 +47,11 @@ class ConflictException(AppException):
         super().__init__(status_code=409, code="CONFLICT", message=message, details=details)
 
 
+class BadRequestException(AppException):
+    def __init__(self, message: str = "Invalid request.", details: Optional[List[Any]] = None):
+        super().__init__(status_code=400, code="BAD_REQUEST", message=message, details=details)
+
+
 class ValidationException(AppException):
     def __init__(self, message: str = "Validation failed.", details: Optional[List[Any]] = None):
         super().__init__(status_code=422, code="VALIDATION_ERROR", message=message, details=details)

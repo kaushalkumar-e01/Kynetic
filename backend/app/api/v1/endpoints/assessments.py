@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from app.api.deps import get_db, get_current_user
-from app.core.errors import NotFoundException
+from app.core.errors import NotFoundException, BadRequestException
 from app.models.user import User
 from app.models.assessment import AssessmentTopic, Question, Assessment, AssessmentAttempt
 from app.models.activity import UserActivity
@@ -23,10 +24,86 @@ from app.schemas.assessment import (
     AIGenerateBatchResponse,
 )
 from app.services.assessment_service import assessment_service
+from app.services.adaptive_engine import adaptive_engine
 from app.services.question_bank_builder import question_bank_builder
 from app.services.question_bank_service import question_bank_service
 
 router = APIRouter()
+
+
+def serialize_public_question(q: Question) -> QuestionPublicResponse:
+    meta = q.evaluation_metadata or {}
+    sample_tc = meta.get("sample_test_cases")
+    if not sample_tc and meta.get("test_cases"):
+        sample_tc = meta.get("test_cases")[:3]
+
+    entry = meta.get("entry_point", "solution")
+    raw_starter_codes = meta.get("starter_codes") or {}
+    starter_codes: Dict[str, str] = {}
+    if q.question_type == "coding":
+        default_starters = {
+            "python": f"def {entry}(*args):\n    # Write your solution here\n    pass\n",
+            "javascript": f"function {entry}(...args) {{\n    // Write your solution here\n}}\n",
+            "typescript": f"function {entry}(...args): any {{\n    // Write your solution here\n}}\n",
+            "c": f"// Implement {entry}\nint {entry}() {{\n    return 0;\n}}\n",
+            "cpp": f"class Solution {{\npublic:\n    int {entry}() {{\n        return 0;\n    }}\n}};\n",
+            "java": f"class Solution {{\n    public int {entry}() {{\n        return 0;\n    }}\n}}\n",
+        }
+        for lang_key in ("python", "javascript", "typescript", "c", "cpp", "java"):
+            starter_codes[lang_key] = raw_starter_codes.get(lang_key) or default_starters[lang_key]
+
+    starter = meta.get("starter_code")
+    if not starter and q.question_type == "coding":
+        lang = (q.programming_language or "python").lower()
+        starter = starter_codes.get(lang, starter_codes.get("python"))
+    elif not starter and q.question_type == "output_prediction":
+        starter = meta.get("code")
+    elif not starter and q.question_type == "debugging":
+        starter = meta.get("buggy_code")
+
+    # Structured examples extraction
+    examples = meta.get("examples")
+    if not examples and sample_tc:
+        examples = []
+        for tc in sample_tc:
+            inp_str = str(tc.get("inputs")) if tc.get("inputs") is not None else ""
+            out_str = str(tc.get("expected")) if tc.get("expected") is not None else ""
+            examples.append({"input": inp_str, "output": out_str})
+
+    constraints = meta.get("constraints") or meta.get("key_concepts") or []
+
+    raw_title = q.title or meta.get("title") or ""
+    clean_title = re.sub(r"^###\s*", "", raw_title).strip()
+    clean_prompt = q.prompt or ""
+    if not clean_title and clean_prompt.startswith("### "):
+        m = re.match(r"^###\s*([^\n]+)", clean_prompt)
+        if m:
+            clean_title = m.group(1).strip()
+
+    if clean_title and clean_prompt.startswith("### "):
+        clean_prompt = re.sub(r"^###\s*[^\n]+\n*", "", clean_prompt).strip()
+
+    return QuestionPublicResponse(
+        id=q.id,
+        topic_id=q.topic_id,
+        category=q.category or "cs_fundamentals",
+        subtopic=q.subtopic,
+        question_type=q.question_type,
+        difficulty=q.difficulty,
+        difficulty_level=q.difficulty_level,
+        programming_language=q.programming_language,
+        title=clean_title or "Technical Assessment Challenge",
+        prompt=clean_prompt,
+        options=q.options or [],
+        starter_code=starter,
+        starter_codes=starter_codes if starter_codes else None,
+        examples=examples if examples else None,
+        constraints=constraints,
+        sample_test_cases=sample_tc or [],
+        schema_ddl=meta.get("schema_ddl"),
+        source_attribution=q.source_attribution,
+        validation_status=q.validation_status or "validated",
+    )
 
 
 @router.get(
@@ -60,7 +137,7 @@ def list_questions(
 
     actual_limit = limit if isinstance(limit, int) else 50
     questions = query.limit(actual_limit).all()
-    return [QuestionPublicResponse.model_validate(q) for q in questions]
+    return [serialize_public_question(q) for q in questions]
 
 
 @router.post(
@@ -102,7 +179,7 @@ def create_assessment(
     next_q = assessment_service.get_next_question(assessment, db)
     dto = AssessmentResponse.model_validate(assessment)
     if next_q:
-        dto.current_question = QuestionPublicResponse.model_validate(next_q)
+        dto.current_question = serialize_public_question(next_q)
     return dto
 
 
@@ -145,7 +222,7 @@ def get_assessment(
     next_q = assessment_service.get_next_question(assessment, db)
     dto = AssessmentResponse.model_validate(assessment)
     if next_q:
-        dto.current_question = QuestionPublicResponse.model_validate(next_q)
+        dto.current_question = serialize_public_question(next_q)
     return dto
 
 
@@ -167,6 +244,8 @@ def submit_answer(
     )
     if not assessment:
         raise NotFoundException("Assessment not found or access denied.")
+    if assessment.status != "in_progress":
+        raise BadRequestException(f"Cannot submit answer to assessment with status '{assessment.status}'.")
 
     question = db.query(Question).filter(Question.id == payload.question_id).first()
     if not question:
@@ -180,6 +259,33 @@ def submit_answer(
         db=db,
     )
     return AssessmentAttemptResponse.model_validate(attempt)
+
+
+@router.post(
+    "/assessments/{assessment_id}/run-code",
+    summary="Run code against sample test cases in sandbox without submitting",
+)
+def run_code_test(
+    assessment_id: str,
+    payload: SubmitCodeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    assessment = (
+        db.query(Assessment)
+        .filter(Assessment.id == assessment_id, Assessment.user_id == current_user.id)
+        .first()
+    )
+    if not assessment:
+        raise NotFoundException("Assessment not found or access denied.")
+    if assessment.status != "in_progress":
+        raise BadRequestException(f"Cannot submit answer to assessment with status '{assessment.status}'.")
+
+    question = db.query(Question).filter(Question.id == payload.question_id).first()
+    if not question:
+        raise NotFoundException("Question not found.")
+
+    return assessment_service.run_code_test(question=question, code_str=payload.code)
 
 
 @router.post(
@@ -200,6 +306,8 @@ def submit_code(
     )
     if not assessment:
         raise NotFoundException("Assessment not found or access denied.")
+    if assessment.status != "in_progress":
+        raise BadRequestException(f"Cannot submit answer to assessment with status '{assessment.status}'.")
 
     question = db.query(Question).filter(Question.id == payload.question_id).first()
     if not question:
@@ -243,6 +351,8 @@ def get_assessment_results(
     correct_count = sum(1 for a in attempts if a.is_correct is True)
     avg_score = (sum(a.score for a in attempts) / total_q) if total_q > 0 else 0.0
 
+    mastery_eval = adaptive_engine.calculate_calibrated_mastery_score(attempts)
+
     if assessment.status != "completed":
         assessment.status = "completed"
         assessment.completed_at = datetime.now(timezone.utc)
@@ -250,6 +360,13 @@ def get_assessment_results(
             "total_questions": total_q,
             "correct_answers": correct_count,
             "average_score": round(avg_score, 1),
+            "mastery_score": mastery_eval["mastery_score"],
+            "mastery_band": mastery_eval["mastery_band"],
+            "highest_tier_passed": mastery_eval["highest_tier_passed"],
+            "highest_tier_level": mastery_eval["highest_tier_level"],
+            "ceiling_applied": mastery_eval["ceiling_applied"],
+            "estimated_ability": mastery_eval["estimated_ability"],
+            "subtopic_abilities": mastery_eval["subtopic_abilities"],
         }
         activity = UserActivity(
             user_id=current_user.id,
@@ -269,6 +386,10 @@ def get_assessment_results(
         total_questions=total_q,
         correct_answers=correct_count,
         average_score=round(avg_score, 1),
+        mastery_score=mastery_eval["mastery_score"],
+        mastery_band=mastery_eval["mastery_band"],
+        highest_tier_passed=mastery_eval["highest_tier_passed"],
+        estimated_ability=mastery_eval["estimated_ability"],
         completed_at=assessment.completed_at,
         attempts=[AssessmentAttemptResponse.model_validate(a) for a in attempts],
     )
@@ -353,4 +474,24 @@ def generate_ai_questions_batch(
         programming_language=payload.programming_language,
     )
     return AIGenerateBatchResponse(**result)
+
+
+@router.post(
+    "/question-bank/questions/{question_id}/validate",
+    summary="Run validation on a question and update its lifecycle status",
+)
+def validate_question_endpoint(
+    question_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    is_valid, msg, question = question_bank_service.validate_question_by_id(question_id, db)
+    if not question:
+        raise NotFoundException("Question not found.")
+    return {
+        "question_id": question.id,
+        "is_valid": is_valid,
+        "validation_status": question.validation_status,
+        "audit_message": msg,
+    }
 

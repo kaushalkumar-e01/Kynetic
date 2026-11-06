@@ -3,9 +3,10 @@ from fastapi import Response, UploadFile
 from pypdf import PdfWriter
 
 from app.models.user import User
+from app.models.assessment import Question
 from app.schemas.auth import UserRegisterRequest
 from app.schemas.profile import UserProfileUpdate
-from app.schemas.assessment import CreateAssessmentRequest, SubmitAnswerRequest
+from app.schemas.assessment import CreateAssessmentRequest, SubmitAnswerRequest, SubmitCodeRequest
 from app.schemas.project import ProjectCreate
 from app.schemas.goal import JobMatchCreate
 from app.schemas.roadmap import RoadmapCreate, MilestoneUpdate
@@ -17,6 +18,7 @@ from app.services.resume_service import resume_service
 from app.api.v1.endpoints.assessments import (
     create_assessment,
     submit_answer,
+    submit_code,
 )
 from app.services.assessment_service import assessment_service
 from app.api.v1.endpoints.projects import create_project, analyze_project_endpoint
@@ -95,10 +97,16 @@ def test_full_kynetic_platform_e2e_flow(db_session, monkeypatch):
     ass_dto = create_assessment(payload=create_ass_req, current_user=user, db=db_session)
     assert ass_dto.current_question is not None
 
-    # Answer MCQ correctly
+    # Answer question correctly
     q1_id = ass_dto.current_question.id
-    ans_req = SubmitAnswerRequest(question_id=q1_id, answer="False")
-    att1 = submit_answer(assessment_id=ass_dto.id, payload=ans_req, current_user=user, db=db_session)
+    q1_obj = db_session.query(Question).filter(Question.id == q1_id).first()
+    if q1_obj.question_type == "coding":
+        code_req = SubmitCodeRequest(question_id=q1_id, language="python", code="def reverse_string(s):\n    return s[::-1]")
+        att1 = submit_code(assessment_id=ass_dto.id, payload=code_req, current_user=user, db=db_session)
+    else:
+        correct_ans = (q1_obj.evaluation_metadata or {}).get("correct_answer", "False")
+        ans_req = SubmitAnswerRequest(question_id=q1_id, answer=correct_ans)
+        att1 = submit_answer(assessment_id=ass_dto.id, payload=ans_req, current_user=user, db=db_session)
     assert att1.score == 100.0
 
     # -------------------------------------------------------------

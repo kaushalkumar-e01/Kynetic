@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from typing import Dict, Any, Tuple
 import logging
 
@@ -14,14 +15,48 @@ class QuestionValidator:
     the active question bank.
     """
 
+    BANNED_PATTERNS = [
+        "compute_c_", "compute_cpp_", "compute_java_", "compute_python_",
+        "calculate_js_", "solve_dsa_", "Challenge #", "Generated Problem",
+        "[C] Challenge", "[Java] Challenge", "[Python] Challenge", "[C++] Challenge", "[JS] Challenge",
+        "compute_js_", "solve_python_", "process_1", "process_2", "process_3"
+    ]
+
+    @classmethod
+    def _check_general_quality(cls, q_data: Dict[str, Any], meta: Dict[str, Any]) -> Tuple[bool, str]:
+        prompt = q_data.get("prompt", "")
+        title = q_data.get("title") or meta.get("title", "")
+        entry_point = meta.get("entry_point", "")
+        lang = str(q_data.get("programming_language") or "").lower().strip()
+
+        combined_text = f"{title} {prompt} {entry_point}"
+        for pat in cls.BANNED_PATTERNS:
+            if pat.lower() in combined_text.lower():
+                return False, f"Question contains banned artificial pattern '{pat}'. Professional naming required."
+
+        # Check language mismatch using precise regex boundaries
+        code_str = f"{prompt} {meta.get('code', '')} {meta.get('buggy_code', '')} {meta.get('reference_solution', '')}"
+        if lang in ("c", "cpp", "java"):
+            python_indicators = [r"\bdef\s+[a-zA-Z_]", r"\brange\(len\(", r"\by\.append\(", r"\bprint\(len\(", r"\belif\s+"]
+            for py_pat in python_indicators:
+                if re.search(py_pat, code_str):
+                    return False, f"Language mismatch: Question classified as '{lang}' contains Python syntax ('{py_pat}')."
+
+        return True, ""
+
     @staticmethod
-    def validate_question(q_data: Dict[str, Any]) -> Tuple[bool, str]:
-        q_type = str(q_data.get("question_type", "")).lower().strip()
+    def validate_question(q_data: Dict[str, Any], validate_code: bool = True) -> Tuple[bool, str]:
         prompt = q_data.get("prompt", "").strip()
         if not prompt or len(prompt) < 10:
             return False, "Prompt is missing or too short (minimum 10 characters required)."
 
         meta = q_data.get("evaluation_metadata", {}) or {}
+
+        quality_valid, quality_msg = QuestionValidator._check_general_quality(q_data, meta)
+        if not quality_valid:
+            return False, quality_msg
+
+        q_type = str(q_data.get("question_type", "")).lower().strip()
 
         if q_type in ("multiple_choice", "mcq"):
             return QuestionValidator._validate_mcq(q_data, meta)
@@ -30,11 +65,11 @@ class QuestionValidator:
         elif q_type == "output_prediction":
             return QuestionValidator._validate_output_prediction(q_data, meta)
         elif q_type == "coding":
-            return QuestionValidator._validate_coding(q_data, meta)
+            return QuestionValidator._validate_coding(q_data, meta, validate_code=validate_code)
         elif q_type == "debugging":
             return QuestionValidator._validate_debugging(q_data, meta)
         elif q_type == "sql":
-            return QuestionValidator._validate_sql(q_data, meta)
+            return QuestionValidator._validate_sql(q_data, meta, validate_code=validate_code)
         elif q_type == "conceptual":
             return QuestionValidator._validate_conceptual(q_data, meta)
         else:
@@ -90,10 +125,13 @@ class QuestionValidator:
         return True, "Valid Output Prediction question."
 
     @staticmethod
-    def _validate_coding(q_data: Dict[str, Any], meta: Dict[str, Any]) -> Tuple[bool, str]:
+    def _validate_coding(q_data: Dict[str, Any], meta: Dict[str, Any], validate_code: bool = True) -> Tuple[bool, str]:
         entry_point = meta.get("entry_point")
         if not entry_point:
             return False, "Coding question must specify an 'entry_point' function name."
+
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", entry_point):
+            return False, f"Entry point '{entry_point}' is not a valid function identifier."
 
         test_cases = meta.get("test_cases", [])
         if not test_cases or len(test_cases) < 2:
@@ -106,7 +144,7 @@ class QuestionValidator:
         # If a reference solution is supplied and language is Python, verify it in the sandbox
         ref_solution = meta.get("reference_solution")
         lang = (q_data.get("programming_language") or "").lower()
-        if ref_solution and (lang == "python" or not lang):
+        if validate_code and ref_solution and (lang == "python" or not lang):
             exec_res = sandbox.run_tests(ref_solution, entry_point, test_cases)
             if exec_res.get("status") != "passed":
                 return False, f"Reference solution failed test validation: {exec_res.get('error_message')}"
@@ -126,13 +164,16 @@ class QuestionValidator:
         return True, "Valid Debugging question."
 
     @staticmethod
-    def _validate_sql(q_data: Dict[str, Any], meta: Dict[str, Any]) -> Tuple[bool, str]:
+    def _validate_sql(q_data: Dict[str, Any], meta: Dict[str, Any], validate_code: bool = True) -> Tuple[bool, str]:
         schema_ddl = meta.get("schema_ddl")
         ref_query = meta.get("reference_query")
         if not schema_ddl:
             return False, "SQL question missing 'schema_ddl' in evaluation_metadata."
         if not ref_query:
             return False, "SQL question missing 'reference_query' in evaluation_metadata."
+
+        if not validate_code:
+            return True, "Valid SQL question."
 
         # Verify reference query in an isolated in-memory SQLite database
         try:

@@ -38,19 +38,39 @@ export type ResumeAnalysisResponse = Schemas["ResumeAnalysisResponse"];
 
 // Skills & Capabilities Types
 export type SkillResponse = Schemas["SkillResponse"];
-export type UserCapabilityResponse = Schemas["UserCapabilityResponse"];
+export type UserCapabilityResponse = Schemas["UserCapabilityResponse"] & {
+  mastery_score?: number | null;
+};
 export type EvidenceRecordResponse = Schemas["EvidenceRecordResponse"];
 export type CreateEvidenceRequest = Schemas["CreateEvidenceRequest"];
 
 // Assessment Types
 export type AssessmentResponse = Schemas["AssessmentResponse"];
 export type AssessmentTopicResponse = Schemas["AssessmentTopicResponse"];
-export type QuestionPublicResponse = Schemas["QuestionPublicResponse"];
+export type QuestionPublicResponse = Schemas["QuestionPublicResponse"] & {
+  title?: string | null;
+  category?: string;
+  subtopic?: string | null;
+  difficulty_level?: number;
+  programming_language?: string | null;
+  starter_code?: string | null;
+  starter_codes?: Record<string, string> | null;
+  examples?: Array<{ input: string; output: string; explanation?: string }> | null;
+  constraints?: string[];
+  sample_test_cases?: Array<{ inputs: unknown[]; expected: unknown }>;
+  schema_ddl?: string | null;
+  validation_status?: string;
+};
 export type CreateAssessmentRequest = Schemas["CreateAssessmentRequest"];
 export type SubmitAnswerRequest = Schemas["SubmitAnswerRequest"];
 export type SubmitCodeRequest = Schemas["SubmitCodeRequest"];
 export type AssessmentAttemptResponse = Schemas["AssessmentAttemptResponse"];
-export type AssessmentSummaryResultsResponse = Schemas["AssessmentSummaryResultsResponse"];
+export type AssessmentSummaryResultsResponse = Schemas["AssessmentSummaryResultsResponse"] & {
+  mastery_score?: number;
+  mastery_band?: string;
+  highest_tier_passed?: string;
+  estimated_ability?: number;
+};
 
 // Project Types
 export type ProjectAnalysisResponse = Schemas["ProjectAnalysisResponse"] & {

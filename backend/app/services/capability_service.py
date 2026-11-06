@@ -64,13 +64,20 @@ def recalculate_user_capability(user_id: str, skill_id: str, db: Session) -> Use
             q_id = str(ev.source_record_id or ev.id)
             score_val = float(meta.get("score", 100.0 if meta.get("is_correct", True) else 0.0))
             difficulty = str(meta.get("difficulty", "medium")).lower()
+            diff_level = int(meta.get("difficulty_level") or 0)
+            if diff_level == 0:
+                level_map = {"very_easy": 1, "easy": 2, "medium": 3, "hard": 4, "very_hard": 5, "expert": 6}
+                diff_level = level_map.get(difficulty, 3)
+
+            is_correct = bool(meta.get("is_correct", score_val >= 60.0))
 
             # Keep best attempt for this unique question
             if q_id not in assessments_by_question or score_val > assessments_by_question[q_id]["score"]:
                 assessments_by_question[q_id] = {
                     "score": score_val,
                     "difficulty": difficulty,
-                    "is_correct": meta.get("is_correct", score_val >= 60.0),
+                    "difficulty_level": diff_level,
+                    "is_correct": is_correct,
                 }
 
         elif stype == "project":
@@ -81,21 +88,37 @@ def recalculate_user_capability(user_id: str, skill_id: str, db: Session) -> Use
                     "code_verified": is_code_verified,
                 }
 
-    # Calculate assessment points (max 75 pts)
+    # Points calculation across 6 difficulty tiers (max 75 pts)
     easy_points = 0.0
     medium_points = 0.0
     hard_points = 0.0
     assessment_conf_sum = 0.0
 
+    highest_passed_tier = 0
+    passed_by_tier: Dict[int, int] = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
+
     for q_data in assessments_by_question.values():
         ratio = max(0.0, min(1.0, q_data["score"] / 100.0))
         diff = q_data["difficulty"]
+        lvl = q_data["difficulty_level"]
 
-        if diff == "easy":
+        if q_data["is_correct"]:
+            highest_passed_tier = max(highest_passed_tier, lvl)
+            passed_by_tier[lvl] = passed_by_tier.get(lvl, 0) + 1
+
+        if diff == "very_easy" or lvl == 1:
+            easy_points += 6.0 * ratio
+        elif diff == "easy" or lvl == 2:
             easy_points += 10.0 * ratio
-        elif diff == "hard":
+        elif diff == "medium" or lvl == 3:
+            medium_points += 15.0 * ratio
+        elif diff == "hard" or lvl == 4:
             hard_points += 20.0 * ratio
-        else:  # default medium
+        elif diff == "very_hard" or lvl == 5:
+            hard_points += 25.0 * ratio
+        elif diff == "expert" or lvl == 6:
+            hard_points += 30.0 * ratio
+        else:
             medium_points += 15.0 * ratio
 
         assessment_conf_sum += 0.12 if q_data["is_correct"] else 0.05
@@ -119,17 +142,47 @@ def recalculate_user_capability(user_id: str, skill_id: str, db: Session) -> Use
 
     project_points = min(25.0, project_points)
 
-    # Verified proficiency score (claims contribute 0.0 points!)
-    total_score = round(min(100.0, total_assessment_points + project_points), 1)
+    raw_total_score = min(100.0, total_assessment_points + project_points)
+
+    # Section 13: Strict Ceilings based on demonstrated difficulty tier
+    TIER_PERSISTENT_CEILINGS = {
+        0: 50.0 if projects_by_id else 0.0,
+        1: 35.0,  # Level 1 only -> max 35.0 (3.5/10.0)
+        2: 45.0,  # Level 2 only -> max 45.0 (4.5/10.0)
+        3: 65.0,  # Level 3 only -> max 65.0 (6.5/10.0)
+        4: 80.0,  # Level 4 -> max 80.0 (8.0/10.0)
+        5: 90.0,  # Level 5 -> max 90.0 (9.0/10.0)
+        6: 100.0, # Level 6 -> unlocks up to 100.0 (10.0/10.0)
+    }
+
+    ceiling = TIER_PERSISTENT_CEILINGS.get(highest_passed_tier, 100.0)
+    calibrated_score = min(raw_total_score, ceiling)
+
+    total_passed = sum(passed_by_tier.values())
 
     # Calculate confidence (0.0 to 0.98)
     base_claim_conf = min(0.20, 0.10 + (0.05 * min(claim_count, 2))) if has_claims else 0.0
     total_conf = round(min(0.98, base_claim_conf + assessment_conf_sum + project_conf_sum), 2)
 
+    # Section 13: Extremely Strict 9/10 and 10/10 Requirements:
+    # Scores > 90.0 require highest_passed_tier >= 5 and at least 2 passed challenges
+    if calibrated_score > 90.0:
+        if highest_passed_tier < 5 or total_passed < 2:
+            calibrated_score = 90.0
+
+    # Scores >= 95.0 (9.5 to 10.0/10) require Level 6 (Expert), >= 4 passed challenges, and high confidence (>= 0.80)
+    if calibrated_score >= 95.0:
+        if highest_passed_tier < 6 or total_passed < 4 or total_conf < 0.80:
+            calibrated_score = 92.0
+
+    total_score = round(calibrated_score, 1)
+
     # Assign estimated band
-    if total_score >= 80.0:
+    if total_score >= 90.0 and highest_passed_tier >= 5:
+        estimated_band = "expert"
+    elif total_score >= 75.0 and highest_passed_tier >= 4:
         estimated_band = "advanced"
-    elif total_score >= 50.0:
+    elif total_score >= 50.0 and highest_passed_tier >= 3:
         estimated_band = "proficient"
     elif total_score > 0.0:
         estimated_band = "foundational"

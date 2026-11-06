@@ -1,10 +1,11 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AssessmentTopic, Question, Assessment, AssessmentAttempt
 from app.models.skill import Skill, EvidenceRecord
 from app.services.capability_service import recalculate_user_capability
 from app.services.sandbox import sandbox
+from app.services.adaptive_engine import adaptive_engine
 
 
 DEFAULT_TOPICS_AND_QUESTIONS = [
@@ -154,14 +155,19 @@ class AssessmentService:
                 db.flush()
 
             for q_data in topic_data["questions"]:
+                diff_str = q_data.get("difficulty", "easy")
+                diff_lvl = adaptive_engine.get_difficulty_level_from_str(diff_str)
                 q = Question(
                     topic_id=topic.id,
                     question_type=q_data["question_type"],
-                    difficulty=q_data["difficulty"],
+                    difficulty=diff_str,
+                    difficulty_level=diff_lvl,
+                    title=q_data.get("title") or q_data.get("prompt", "")[:60],
                     prompt=q_data["prompt"],
                     options=q_data.get("options", []),
                     evaluation_metadata=q_data["evaluation_metadata"],
                     source_attribution=q_data.get("source_attribution"),
+                    validation_status="validated",
                     is_active=True,
                 )
                 db.add(q)
@@ -170,52 +176,12 @@ class AssessmentService:
 
     @staticmethod
     def get_adaptive_next_difficulty(attempts: List[AssessmentAttempt]) -> str:
-        if not attempts:
-            return "easy"
-
-        # Check the last 2 attempts
-        recent = attempts[-2:]
-        if all(a.is_correct is True for a in recent):
-            last_diff = recent[-1].question.difficulty
-            if last_diff == "easy":
-                return "medium"
-            elif last_diff == "medium":
-                return "hard"
-            return "hard"
-        elif all(a.is_correct is False for a in recent):
-            last_diff = recent[-1].question.difficulty
-            if last_diff == "hard":
-                return "medium"
-            elif last_diff == "medium":
-                return "easy"
-            return "easy"
-
-        return recent[-1].question.difficulty
+        lvl = adaptive_engine.get_adaptive_next_difficulty_level(attempts)
+        return adaptive_engine.get_difficulty_str_from_level(lvl)
 
     @staticmethod
-    def get_next_question(assessment: Assessment, db: Session) -> Optional[Question]:
-        # Gather IDs of questions already attempted in this assessment
-        attempted_q_ids = [a.question_id for a in assessment.attempts]
-
-        # Determine target difficulty based on performance
-        target_diff = AssessmentService.get_adaptive_next_difficulty(assessment.attempts)
-
-        # Query active questions in selected topics matching target difficulty
-        topics = assessment.selected_topics or []
-        query = db.query(Question).join(AssessmentTopic).filter(
-            Question.is_active.is_(True),
-            ~Question.id.in_(attempted_q_ids) if attempted_q_ids else True,
-        )
-        if topics:
-            query = query.filter(AssessmentTopic.name.in_(topics))
-
-        # Try target difficulty first
-        q = query.filter(Question.difficulty == target_diff).first()
-        if not q:
-            # Fallback to any remaining difficulty in the selected topics
-            q = query.first()
-
-        return q
+    def get_next_question(assessment: Assessment, db: Session, max_questions: int = 10) -> Optional[Question]:
+        return adaptive_engine.get_next_question(assessment, db, max_questions=max_questions)
 
     @staticmethod
     def evaluate_quiz_answer(
@@ -225,11 +191,113 @@ class AssessmentService:
         user_id: str,
         db: Session,
     ) -> AssessmentAttempt:
-        correct_answer = question.evaluation_metadata.get("correct_answer")
-        explanation = question.evaluation_metadata.get("explanation", "")
+        q_type = (question.question_type or "multiple_choice").lower()
+        meta = question.evaluation_metadata or {}
+        explanation = meta.get("explanation", "")
+        execution_result = None
 
-        is_correct = (str(user_answer).strip().lower() == str(correct_answer).strip().lower())
-        score = 100.0 if is_correct else 0.0
+        def matches_option_or_letter(user_ans: str, expected_val: str, options: list) -> bool:
+            u_clean = str(user_ans).strip().lower()
+            exp_clean = str(expected_val).strip().lower()
+            if u_clean == exp_clean:
+                return True
+            # Support letter selection (A, B, C, D) or index (0, 1, 2, 3) or "Option A"
+            letter_map = {"a": 0, "b": 1, "c": 2, "d": 3}
+            idx = None
+            if u_clean in letter_map:
+                idx = letter_map[u_clean]
+            elif u_clean.isdigit():
+                idx = int(u_clean)
+            elif u_clean.startswith("option ") and len(u_clean) == 8 and u_clean[7] in letter_map:
+                idx = letter_map[u_clean[7]]
+
+            if idx is not None and options and 0 <= idx < len(options):
+                opt = options[idx]
+                opt_str = opt if isinstance(opt, str) else opt.get("text", "")
+                if str(opt_str).strip().lower() == exp_clean:
+                    return True
+            return False
+
+        if q_type == "sql":
+            import sqlite3
+            schema_ddl = meta.get("schema_ddl", "")
+            ref_query = meta.get("reference_query", "")
+            is_correct = False
+            score = 0.0
+
+            clean_query = str(user_answer or "").strip()
+            if not clean_query:
+                is_correct = False
+                score = 0.0
+                feedback = "Empty SQL query submitted. Please write a query."
+                execution_result = {"error": "Empty query"}
+            else:
+                # Anti-abuse SQL guards
+                forbidden_keywords = ["ATTACH", "DETACH", "PRAGMA", "VACUUM"]
+                has_forbidden = any(kw in clean_query.upper().split() for kw in forbidden_keywords)
+                if has_forbidden:
+                    is_correct = False
+                    score = 0.0
+                    feedback = "Security restriction: Administrative and file-access SQL commands are forbidden."
+                    execution_result = {"error": "Forbidden command"}
+                else:
+                    try:
+                        with sqlite3.connect(":memory:") as conn:
+                            cur = conn.cursor()
+                            if schema_ddl:
+                                cur.executescript(schema_ddl)
+                            cur.execute(ref_query)
+                            expected_rows = cur.fetchall()
+
+                            cur.execute(clean_query)
+                            actual_rows = cur.fetchall()
+
+                            if actual_rows == expected_rows:
+                                is_correct = True
+                                score = 100.0
+                                feedback = "Correct! SQL query returned the exact expected result set."
+                            else:
+                                feedback = f"Output mismatch. Expected {len(expected_rows)} rows, got {len(actual_rows)} rows."
+                            execution_result = {"expected_rows": len(expected_rows), "actual_rows": len(actual_rows)}
+                    except Exception as e:
+                        is_correct = False
+                        score = 0.0
+                        feedback = f"SQL Execution Error: {str(e)}"
+                        execution_result = {"error": str(e)}
+
+        elif q_type == "output_prediction":
+            expected = meta.get("expected_output") or meta.get("correct_answer", "")
+            is_correct = matches_option_or_letter(user_answer, expected, question.options or [])
+            score = 100.0 if is_correct else 0.0
+            feedback = f"{'Correct output!' if is_correct else 'Incorrect output.'} {explanation}"
+
+        elif q_type == "debugging":
+            expected = meta.get("correct_fix") or meta.get("correct_answer", "")
+            is_correct = matches_option_or_letter(user_answer, expected, question.options or [])
+            score = 100.0 if is_correct else 0.0
+            feedback = f"{'Defect correctly identified and resolved!' if is_correct else 'Incorrect fix.'} {explanation}"
+
+        elif q_type == "conceptual":
+            rubric = meta.get("rubric", "")
+            key_concepts = meta.get("key_concepts", [])
+            user_lower = str(user_answer).lower()
+            matched_concepts = [c for c in key_concepts if c.lower() in user_lower]
+            if key_concepts:
+                ratio = len(matched_concepts) / len(key_concepts)
+                score = round(ratio * 100.0, 1)
+                is_correct = score >= 50.0
+            else:
+                score = 80.0 if len(user_answer.strip()) > 30 else 40.0
+                is_correct = score >= 50.0
+
+            feedback = f"{'Demonstrated solid conceptual comprehension.' if is_correct else 'Needs deeper explanation.'} Rubric Focus: {rubric}"
+            execution_result = {"matched_concepts": matched_concepts, "total_concepts": len(key_concepts)}
+
+        else:  # multiple_choice, multi_select, default
+            correct_answer = meta.get("correct_answer") or ""
+            is_correct = matches_option_or_letter(user_answer, correct_answer, question.options or [])
+            score = 100.0 if is_correct else 0.0
+            feedback = f"{'Correct!' if is_correct else 'Incorrect.'} {explanation}"
 
         attempt = AssessmentAttempt(
             user_id=user_id,
@@ -238,7 +306,8 @@ class AssessmentService:
             submitted_answer={"answer": user_answer},
             is_correct=is_correct,
             score=score,
-            feedback=f"{'Correct!' if is_correct else 'Incorrect.'} {explanation}",
+            execution_result=execution_result,
+            feedback=feedback,
         )
         db.add(attempt)
         db.flush()
@@ -249,6 +318,17 @@ class AssessmentService:
         db.commit()
         db.refresh(attempt)
         return attempt
+
+    @staticmethod
+    def run_code_test(
+        question: Question,
+        code_str: str,
+    ) -> Dict[str, Any]:
+        """Runs candidate code against public/sample test cases only without permanent scoring."""
+        meta = question.evaluation_metadata or {}
+        entry_point = meta.get("entry_point", "solution")
+        test_cases = meta.get("sample_test_cases") or meta.get("test_cases", [])[:2]
+        return sandbox.run_tests(code_str, entry_point, test_cases)
 
     @staticmethod
     def evaluate_code_submission(
@@ -262,10 +342,26 @@ class AssessmentService:
         test_cases = question.evaluation_metadata.get("test_cases", [])
 
         exec_result = sandbox.run_tests(code_str, entry_point, test_cases)
-        is_correct = exec_result.get("status") == "passed"
+        status_val = exec_result.get("status")
+        is_correct = (status_val == "passed")
         passed_tests = exec_result.get("passed_tests", 0)
         total_tests = exec_result.get("total_tests", len(test_cases))
         score = (passed_tests / total_tests * 100.0) if total_tests > 0 else 0.0
+
+        if status_val == "cheating_detected":
+            is_correct = False
+            score = 0.0
+            feedback = f"Integrity check failed: {exec_result.get('error_message')}"
+        elif status_val == "forbidden":
+            is_correct = False
+            score = 0.0
+            feedback = f"Security restriction: {exec_result.get('error_message')}"
+        elif status_val == "timeout":
+            is_correct = False
+            score = 0.0
+            feedback = "Time Limit Exceeded: Execution took longer than 3.0 seconds."
+        else:
+            feedback = exec_result.get("error_message") or "All unit tests passed successfully."
 
         attempt = AssessmentAttempt(
             user_id=user_id,
@@ -275,7 +371,7 @@ class AssessmentService:
             is_correct=is_correct,
             score=score,
             execution_result=exec_result,
-            feedback=exec_result.get("error_message") or "All unit tests passed successfully.",
+            feedback=feedback,
         )
         db.add(attempt)
         db.flush()
@@ -306,13 +402,50 @@ class AssessmentService:
             source_record_id=question.id,
             summary=f"{'Passed' if is_correct else 'Attempted'} {question.difficulty} question on {topic_name} with score {score:.0f}%.",
             confidence=0.85 if is_correct else 0.6,
-            quality_metadata={"difficulty": question.difficulty, "is_correct": is_correct, "score": score},
+            quality_metadata={"difficulty": question.difficulty, "difficulty_level": question.difficulty_level, "is_correct": is_correct, "score": score},
         )
         db.add(evidence)
         db.flush()
 
         # Recalculate Capability using principled evidence-based scoring
         recalculate_user_capability(user_id=user_id, skill_id=skill.id, db=db)
+
+        # Check if question has a distinct programming language to also reward
+        if question.programming_language and question.programming_language.lower() not in ("none", "", "text"):
+            lang_key = question.programming_language.lower()
+            lang_names = {
+                "python": "Python",
+                "javascript": "Javascript",
+                "typescript": "Typescript",
+                "java": "Java",
+                "c": "C",
+                "cpp": "C++",
+                "sql": "SQL",
+            }
+            canon_lang = lang_names.get(lang_key, lang_key.capitalize())
+            if canon_lang.lower() != skill.canonical_name.lower():
+                lang_skill = db.query(Skill).filter(Skill.canonical_name.ilike(canon_lang)).first()
+                if not lang_skill:
+                    lang_skill = Skill(canonical_name=canon_lang, category="language")
+                    db.add(lang_skill)
+                    db.flush()
+                lang_ev = EvidenceRecord(
+                    user_id=user_id,
+                    skill_id=lang_skill.id,
+                    source_type="assessment",
+                    source_record_id=question.id,
+                    summary=f"{'Passed' if is_correct else 'Attempted'} {question.difficulty} challenge in {canon_lang} with score {score:.0f}%.",
+                    confidence=0.85 if is_correct else 0.6,
+                    quality_metadata={
+                        "difficulty": question.difficulty,
+                        "difficulty_level": question.difficulty_level,
+                        "is_correct": is_correct,
+                        "score": score,
+                    },
+                )
+                db.add(lang_ev)
+                db.flush()
+                recalculate_user_capability(user_id=user_id, skill_id=lang_skill.id, db=db)
 
 
 assessment_service = AssessmentService()

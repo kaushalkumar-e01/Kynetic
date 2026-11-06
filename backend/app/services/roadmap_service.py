@@ -89,11 +89,24 @@ class RoadmapService:
                 "skill": skill,
             },
         ]
-        if user_cap_score and user_cap_score >= 60.0:
+        if user_cap_score:
+            if user_cap_score >= 85.0:
+                rec_level = "Level 6 (Expert)"
+                target_focus = "solve advanced algorithmic problems, edge-case optimizations, and production concurrency challenges to achieve 10/10 mastery."
+            elif user_cap_score >= 65.0:
+                rec_level = "Level 4–5 (Hard to Very Hard)"
+                target_focus = "deepen algorithmic reasoning, dynamic programming, and systems optimization."
+            elif user_cap_score >= 45.0:
+                rec_level = "Level 3 (Medium)"
+                target_focus = "reinforce data structure manipulation and multi-step algorithmic problem solving."
+            else:
+                rec_level = "Level 1–2 (Very Easy to Easy)"
+                target_focus = "solidify core language syntax, control structures, and basic operations."
+
             resources.append({
-                "type": "status_note",
-                "title": "Baseline Verified",
-                "note": f"You have already demonstrated {user_cap_score:.0f}% proficiency in {skill}. Focus on advanced production architecture.",
+                "type": "adaptive_recommendation",
+                "title": f"Target Assessment Level: {rec_level}",
+                "note": f"Current calibrated baseline: {user_cap_score:.0f}%. Next milestone focus: {target_focus}",
             })
         return resources
 

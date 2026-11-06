@@ -60,6 +60,7 @@ class AssistantService:
                 {
                     "skill": c.skill.canonical_name if c.skill else "Skill",
                     "score": c.score,
+                    "mastery_score": round(c.score / 10.0, 1),
                     "band": c.estimated_band,
                     "confidence": c.confidence,
                 }
@@ -71,6 +72,9 @@ class AssistantService:
                     "mode": a.mode,
                     "status": a.status,
                     "topics": a.selected_topics,
+                    "mastery_score": (a.summary_result or {}).get("mastery_score"),
+                    "mastery_band": (a.summary_result or {}).get("mastery_band"),
+                    "highest_tier_passed": (a.summary_result or {}).get("highest_tier_passed"),
                 }
                 for a in recent_assessments
             ],

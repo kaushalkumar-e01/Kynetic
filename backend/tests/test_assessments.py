@@ -54,8 +54,14 @@ def test_assessment_flow_adaptive_progression(db_session):
     q1_id = assessment_res.current_question.id
 
     # 2. Submit correct answer for Q1
-    ans_req = SubmitAnswerRequest(question_id=q1_id, answer="False")
-    attempt1 = submit_answer(assessment_id=assessment_res.id, payload=ans_req, current_user=user, db=db_session)
+    q1_obj = db_session.query(Question).filter(Question.id == q1_id).first()
+    if q1_obj.question_type == "coding":
+        code_req = SubmitCodeRequest(question_id=q1_id, language="python", code="def reverse_string(s):\n    return s[::-1]")
+        attempt1 = submit_code(assessment_id=assessment_res.id, payload=code_req, current_user=user, db=db_session)
+    else:
+        correct_ans = (q1_obj.evaluation_metadata or {}).get("correct_answer", "False")
+        ans_req = SubmitAnswerRequest(question_id=q1_id, answer=correct_ans)
+        attempt1 = submit_answer(assessment_id=assessment_res.id, payload=ans_req, current_user=user, db=db_session)
     assert attempt1.is_correct is True
     assert attempt1.score == 100.0
 

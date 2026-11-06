@@ -329,3 +329,82 @@ Keep your response concise, structured, and actionable. Do not reveal private ke
             return raw_output.strip()
 
         return self.fallback.generate_chat_response(user_prompt, context)
+
+    def generate_question_batch(
+        self,
+        skill_or_topic: str,
+        category: str,
+        difficulty: str,
+        question_type: str,
+        batch_size: int,
+        programming_language: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if not self._is_configured:
+            return self.fallback.generate_question_batch(
+                skill_or_topic, category, difficulty, question_type, batch_size, programming_language
+            )
+
+        prompt = f"""
+You are a Principal Assessment Engineer for Kynetic, designing competitive-programming and engineering interview questions of the highest standard (LeetCode, HackerRank, Codeforces caliber).
+Generate exactly {batch_size} original, non-trivial, production-grade technical assessment questions.
+
+Topic: {skill_or_topic}
+Category: {category}
+Question Type: {question_type}
+Target Difficulty: {difficulty}
+Programming Language: {programming_language or 'none'}
+
+STRICT RULES:
+1. Natural, concise Title for each question (e.g. "Two Sum", "Merge Intervals", "Valid Parentheses").
+2. BANNED PATTERNS: NEVER use artificial function names like `compute_c_1`, `compute_java_5`, `solve_dsa_2`, or titles like `Challenge #1`. Function names must be standard, idiomatic names (e.g., `two_sum`, `is_palindrome`, `merge_sorted_arrays`).
+3. For Coding Challenges:
+   - Provide a complete, professional problem statement with clear description, input/output contract, constraints, and 2-3 structured examples with input, output, and explanation.
+   - Include multi-language starter codes in `starter_codes` object for python, javascript, c, cpp, and java.
+   - Include reference solution in Python (or the specified language) that correctly solves the problem.
+   - Include at least 3 test cases with inputs and expected outputs.
+4. For Output Prediction & Debugging: Code snippet syntax must STRICTLY match the target language. NEVER use Python syntax for C, C++, or Java.
+5. For SQL: Provide real schema DDL and correct reference query.
+
+Output a strict JSON array of objects matching this schema:
+[
+  {{
+    "title": "Concise Problem Title",
+    "prompt": "Full professional problem statement with description, constraints, and formatted examples",
+    "subtopic": "{skill_or_topic}",
+    "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+    "evaluation_metadata": {{
+      "title": "Concise Problem Title",
+      "entry_point": "natural_function_name",
+      "starter_codes": {{
+        "python": "def function_name(arg: type) -> type:\\n    pass\\n",
+        "javascript": "function functionName(arg) {{\\n}}\\n",
+        "typescript": "function functionName(arg: type): type {{\\n}}\\n",
+        "c": "int function_name(int arg) {{\\n}}\\n",
+        "cpp": "class Solution {{\\npublic:\\n    int functionName(int arg) {{\\n    }}\\n}};\\n",
+        "java": "class Solution {{\\n    public int functionName(int arg) {{\\n    }}\\n}}\\n"
+      }},
+      "correct_answer": "Exact correct answer text",
+      "explanation": "Detailed rationale",
+      "test_cases": [{{"inputs": [1, 2], "expected": 3}}],
+      "reference_solution": "def function_name(arg): ...",
+      "buggy_code": "code with bug (for debugging)",
+      "correct_fix": "description of fix (for debugging)",
+      "schema_ddl": "CREATE TABLE ... (for SQL)",
+      "reference_query": "SELECT ... (for SQL)",
+      "rubric": "Rubric criteria (for conceptual)",
+      "key_concepts": ["concept1", "concept2"],
+      "constraints": ["1 <= n <= 10^5"]
+    }}
+  }}
+]
+Output valid JSON only. Do not wrap in markdown fences.
+"""
+        raw_output = self._execute_with_retry(prompt)
+        parsed = extract_json_from_text(raw_output) if raw_output else None
+        if parsed and isinstance(parsed, list) and len(parsed) > 0:
+            return parsed
+
+        logger.info("Falling back to deterministic question template generation.")
+        return self.fallback.generate_question_batch(
+            skill_or_topic, category, difficulty, question_type, batch_size, programming_language
+        )

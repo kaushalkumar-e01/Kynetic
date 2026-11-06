@@ -64,6 +64,9 @@ export default function ProjectsView() {
 
   useEffect(() => {
     loadProjects();
+    if (typeof window !== "undefined" && window.location.pathname.includes("/new")) {
+      setShowAdd(true);
+    }
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {

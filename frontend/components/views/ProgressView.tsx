@@ -59,7 +59,7 @@ export default function ProgressView() {
                   <div key={c.id}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                       <span><strong>{c.skill_name || "Skill"}</strong> · <span className="muted">{c.estimated_band}</span></span>
-                      <span>{Math.round(c.score)} pts</span>
+                      <span>{c.mastery_score !== undefined && c.mastery_score !== null ? `${c.mastery_score.toFixed(1)}/10` : `${Math.round(c.score)} pts`}</span>
                     </div>
                     <div className="progress-track" style={{ height: 6 }}>
                       <div className="progress-value" style={{ width: `${Math.round(c.score)}%` }} />

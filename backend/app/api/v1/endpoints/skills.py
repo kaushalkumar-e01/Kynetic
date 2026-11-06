@@ -50,6 +50,7 @@ def list_user_capabilities(
         if c.skill:
             cap_dto.skill_name = c.skill.canonical_name
             cap_dto.category = c.skill.category
+        cap_dto.mastery_score = round(c.score / 10.0, 1)
         results.append(cap_dto)
     return results
 
@@ -76,6 +77,7 @@ def get_user_capability(
     if capability.skill:
         cap_dto.skill_name = capability.skill.canonical_name
         cap_dto.category = capability.skill.category
+    cap_dto.mastery_score = round(capability.score / 10.0, 1)
     return cap_dto
 
 

@@ -71,7 +71,7 @@ export default function CapabilitiesView() {
 
   const mapBandToEvidenceKind = (band: string): EvidenceKind => {
     if (band === "claimed") return "claimed";
-    if (band === "proficient" || band === "advanced") return "assessed";
+    if (band === "proficient" || band === "advanced" || band === "expert") return "assessed";
     return "project";
   };
 
@@ -236,7 +236,11 @@ export default function CapabilitiesView() {
                       {skill.evidence_count !== 1 ? "s" : ""}
                     </div>
                   </div>
-                  <div className="skill-score">{Math.round(skill.score)}</div>
+                  <div className="skill-score">
+                    {skill.mastery_score !== undefined && skill.mastery_score !== null
+                      ? `${skill.mastery_score.toFixed(1)}/10`
+                      : `${Math.round(skill.score)}`}
+                  </div>
                 </div>
 
                 <div className="progress-track" style={{ marginTop: 14 }}>

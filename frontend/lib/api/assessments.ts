@@ -134,29 +134,27 @@ export async function submitAnswer(
   });
 }
 
-/**
- * SECURITY NOTE: Code execution submissions are intentionally blocked against
- * the real backend until isolated runner container is provisioned.
- */
+export async function runCode(
+  assessmentId: string,
+  data: SubmitCodeRequest
+): Promise<{ status: string; passed_tests: number; total_tests: number; test_results?: unknown[]; error_message?: string }> {
+  return apiClient<{ status: string; passed_tests: number; total_tests: number; test_results?: unknown[]; error_message?: string }>(
+    `/assessments/${assessmentId}/run-code`,
+    {
+      method: "POST",
+      body: data,
+    }
+  );
+}
+
 export async function submitCode(
   assessmentId: string,
   data: SubmitCodeRequest
 ): Promise<AssessmentAttemptResponse> {
-  if (!shouldUseMock("coding_sandbox")) {
-    throw new Error(
-      "Code execution is temporarily unavailable in live mode for security reasons. Coming soon in isolated sandbox."
-    );
-  }
-  return {
-    id: `code-att-${Date.now()}`,
-    assessment_id: assessmentId,
-    question_id: data.question_id,
-    is_correct: true,
-    score: 100.0,
-    feedback: "All test cases passed (Simulated Sandbox).",
-    execution_result: { runtime_ms: 42, memory_kb: 1240 },
-    created_at: new Date().toISOString(),
-  };
+  return apiClient<AssessmentAttemptResponse>(`/assessments/${assessmentId}/code-submissions`, {
+    method: "POST",
+    body: data,
+  });
 }
 
 export async function getAssessmentResults(
