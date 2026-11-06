@@ -143,9 +143,7 @@ export default function AssessmentsView() {
       ([topRes, assRes]) => {
         if (topRes.status === "fulfilled") {
           setTopics(topRes.value);
-          if (topRes.value.length > 0 && !selectedTopic) {
-            setSelectedTopic(topRes.value[0].name);
-          }
+          setSelectedTopic((prev) => (prev ? prev : topRes.value.length > 0 ? topRes.value[0].name : ""));
         }
         if (assRes.status === "fulfilled") {
           setPastAssessments(assRes.value);
@@ -153,7 +151,7 @@ export default function AssessmentsView() {
         setLoading(false);
       }
     );
-  }, [selectedTopic]);
+  }, []);
 
   useEffect(() => {
     loadInitialData();
@@ -228,8 +226,14 @@ export default function AssessmentsView() {
         title: `${selectedTopic || "Technical"} ${modeLabels[selectedMode] || "Assessment"}`,
       });
 
+      if (!assessment.current_question) {
+        setErrorMessage("No questions available for this domain and mode combination. Please select another mode or domain.");
+        return;
+      }
+
       setActiveAssessment(assessment);
-      applyQuestionState(assessment.current_question || null);
+      applyQuestionState(assessment.current_question);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message);
@@ -238,6 +242,33 @@ export default function AssessmentsView() {
       }
     } finally {
       setStarting(false);
+    }
+  };
+
+  const handleResumeAssessment = async (assessmentId: string) => {
+    setLoadingPastResultId(assessmentId);
+    setErrorMessage(null);
+    try {
+      const refreshed = await assessmentsApi.getAssessment(assessmentId);
+      if (refreshed.current_question) {
+        setActiveAssessment(refreshed);
+        applyQuestionState(refreshed.current_question);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        const results = await assessmentsApi.getAssessmentResults(assessmentId);
+        setSummaryResults(results);
+        setActiveAssessment(null);
+        applyQuestionState(null);
+        loadInitialData();
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Failed to resume assessment.");
+      }
+    } finally {
+      setLoadingPastResultId(null);
     }
   };
 
@@ -2043,7 +2074,19 @@ export default function AssessmentsView() {
                         </div>
                       </div>
                     ) : (
-                      <span className="muted" style={{ fontSize: 11 }}>In Progress</span>
+                      <button
+                        onClick={() => handleResumeAssessment(a.id)}
+                        className="btn btn-primary"
+                        style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
+                        disabled={loadingPastResultId === a.id}
+                      >
+                        {loadingPastResultId === a.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Play size={12} />
+                        )}
+                        Resume
+                      </button>
                     )}
                   </div>
 

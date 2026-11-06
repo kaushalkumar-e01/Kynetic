@@ -30,6 +30,12 @@ if not exist "backend\.env" (
     copy "backend\.env.example" "backend\.env" >nul
 )
 
+:: 3.5. Run database migrations
+echo [INFO] Applying database migrations...
+cd backend
+python -m alembic upgrade head >nul 2>nul
+cd ..
+
 :: 4. Setup frontend environment
 if not exist "frontend\.env.local" (
     echo [INFO] Creating frontend\.env.local from template...

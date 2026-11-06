@@ -177,9 +177,16 @@ def create_assessment(
 
     # Get initial adaptive question
     next_q = assessment_service.get_next_question(assessment, db)
+    if not next_q:
+        db.delete(assessment)
+        db.commit()
+        topics_str = ", ".join(payload.selected_topics) if payload.selected_topics else "selected topics"
+        raise BadRequestException(
+            f"No questions currently available matching {topics_str} in '{payload.mode}' mode. Please choose another domain or mode."
+        )
+
     dto = AssessmentResponse.model_validate(assessment)
-    if next_q:
-        dto.current_question = serialize_public_question(next_q)
+    dto.current_question = serialize_public_question(next_q)
     return dto
 
 

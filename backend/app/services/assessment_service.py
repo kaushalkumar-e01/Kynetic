@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.models.assessment import AssessmentTopic, Question, Assessment, AssessmentAttempt
 from app.models.skill import Skill, EvidenceRecord
@@ -107,7 +108,7 @@ DEFAULT_TOPICS_AND_QUESTIONS = [
         ],
     },
     {
-        "topic": "SQL & Relational Databases",
+        "topic": "SQL & Database Systems",
         "description": "SQL queries, relational modeling, indexes, ACID transactions, and normalization.",
         "skill": "SQL",
         "questions": [
@@ -135,6 +136,48 @@ DEFAULT_TOPICS_AND_QUESTIONS = [
 class AssessmentService:
     @staticmethod
     def seed_initial_bank_if_empty(db: Session):
+        # 1. Self-healing table & schema check: ensure all model tables exist and have up-to-date columns
+        try:
+            from app.models import Base
+            Base.metadata.create_all(bind=db.get_bind())
+
+            if db.get_bind().dialect.name == "sqlite":
+                result = db.execute(text("PRAGMA table_info(questions)")).fetchall()
+                existing_cols = {row[1] for row in result}
+                expected_cols = {
+                    "category": "VARCHAR(100) DEFAULT 'cs_fundamentals'",
+                    "subtopic": "VARCHAR(100)",
+                    "difficulty_level": "INTEGER DEFAULT 2",
+                    "programming_language": "VARCHAR(50)",
+                    "title": "VARCHAR(255)",
+                    "source_name": "VARCHAR(100) DEFAULT 'Kynetic Original Bank'",
+                    "source_license": "VARCHAR(100) DEFAULT 'CC-BY-4.0'",
+                    "source_url": "VARCHAR(255)",
+                    "validation_status": "VARCHAR(50) DEFAULT 'validated'",
+                    "version": "INTEGER DEFAULT 1",
+                }
+                for col_name, col_def in expected_cols.items():
+                    if col_name not in existing_cols:
+                        db.execute(text(f"ALTER TABLE questions ADD COLUMN {col_name} {col_def}"))
+                db.commit()
+        except Exception:
+            db.rollback()
+
+        # 2. Consolidate legacy 'SQL & Relational Databases' topic into canonical 'SQL & Database Systems'
+        try:
+            legacy_sql = db.query(AssessmentTopic).filter(AssessmentTopic.name == "SQL & Relational Databases").first()
+            canonical_sql = db.query(AssessmentTopic).filter(AssessmentTopic.name == "SQL & Database Systems").first()
+            if legacy_sql and canonical_sql:
+                db.query(Question).filter(Question.topic_id == legacy_sql.id).update({"topic_id": canonical_sql.id})
+                db.delete(legacy_sql)
+                db.commit()
+            elif legacy_sql and not canonical_sql:
+                legacy_sql.name = "SQL & Database Systems"
+                legacy_sql.description = "Relational database design, ACID compliance, queries, and indexing."
+                db.commit()
+        except Exception:
+            db.rollback()
+
         topic_count = db.query(AssessmentTopic).count()
         if topic_count == 0:
             for topic_data in DEFAULT_TOPICS_AND_QUESTIONS:

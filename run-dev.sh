@@ -27,6 +27,10 @@ if [ ! -f "$SCRIPT_DIR/backend/.env" ]; then
     cp "$SCRIPT_DIR/backend/.env.example" "$SCRIPT_DIR/backend/.env"
 fi
 
+# 3.5. Run database migrations
+echo "[INFO] Applying database migrations..."
+(cd "$SCRIPT_DIR/backend" && $PYTHON_CMD -m alembic upgrade head > /dev/null 2>&1 || true)
+
 # 4. Setup frontend environment
 if [ ! -f "$SCRIPT_DIR/frontend/.env.local" ]; then
     echo "[INFO] Creating frontend/.env.local from template..."

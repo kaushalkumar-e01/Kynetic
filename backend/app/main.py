@@ -28,7 +28,8 @@ async def lifespan(app: FastAPI):
     # 2. In development or test, ensure database tables exist and seed initial bank if fresh
     if settings.APP_ENV in ("development", "test"):
         try:
-            from app.db.base import Base
+            import app.models  # Ensure all SQLAlchemy models are registered to Base.metadata
+            from app.models import Base
             from app.db.session import engine, SessionLocal
             Base.metadata.create_all(bind=engine)
 

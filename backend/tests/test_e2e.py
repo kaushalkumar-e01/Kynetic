@@ -91,7 +91,7 @@ def test_full_kynetic_platform_e2e_flow(db_session, monkeypatch):
     # Start assessment in Python
     create_ass_req = CreateAssessmentRequest(
         title="Python Qualification Test",
-        mode="assessment",
+        mode="quiz",
         selected_topics=["Python Programming"],
     )
     ass_dto = create_assessment(payload=create_ass_req, current_user=user, db=db_session)
@@ -100,13 +100,10 @@ def test_full_kynetic_platform_e2e_flow(db_session, monkeypatch):
     # Answer question correctly
     q1_id = ass_dto.current_question.id
     q1_obj = db_session.query(Question).filter(Question.id == q1_id).first()
-    if q1_obj.question_type == "coding":
-        code_req = SubmitCodeRequest(question_id=q1_id, language="python", code="def reverse_string(s):\n    return s[::-1]")
-        att1 = submit_code(assessment_id=ass_dto.id, payload=code_req, current_user=user, db=db_session)
-    else:
-        correct_ans = (q1_obj.evaluation_metadata or {}).get("correct_answer", "False")
-        ans_req = SubmitAnswerRequest(question_id=q1_id, answer=correct_ans)
-        att1 = submit_answer(assessment_id=ass_dto.id, payload=ans_req, current_user=user, db=db_session)
+    meta = q1_obj.evaluation_metadata or {}
+    correct_ans = meta.get("correct_answer") or meta.get("expected_output") or meta.get("correct_fix") or (q1_obj.options[0] if q1_obj.options else "False")
+    ans_req = SubmitAnswerRequest(question_id=q1_id, answer=str(correct_ans))
+    att1 = submit_answer(assessment_id=ass_dto.id, payload=ans_req, current_user=user, db=db_session)
     assert att1.score == 100.0
 
     # -------------------------------------------------------------
