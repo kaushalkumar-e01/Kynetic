@@ -7,6 +7,9 @@ from app.ai.gemini_provider import GeminiProvider
 
 def get_llm_provider(provider_type: Optional[str] = None) -> BaseLLMProvider:
     provider_name = (provider_type or settings.LLM_PROVIDER or "").lower().strip()
+    if settings.APP_ENV == "test" or provider_name == "fallback":
+        return FallbackAIProvider()
+
     api_key = settings.effective_gemini_api_key
     model_name = settings.effective_gemini_model
 

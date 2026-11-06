@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.goal import JobMatch
@@ -217,7 +217,6 @@ class MatchingService:
                 band = cap.estimated_band
 
                 if user_score >= 60.0 or has_assessment:
-                    status = "matched"
                     confidence_mult = 1.0 if has_assessment else 0.8
                     provenance = f"Verified: {', '.join(provenance_parts)} ({user_score}% score, {band})."
                     matched_skills.append({
@@ -231,7 +230,6 @@ class MatchingService:
                     })
                     total_weighted_score += weight * confidence_mult
                 else:
-                    status = "partial"
                     confidence_mult = 0.5
                     provenance = f"Developing: {', '.join(provenance_parts) or 'Foundational evidence'} ({user_score}% score, {band}). Assessment verification needed."
                     partial_skills.append({
@@ -247,7 +245,7 @@ class MatchingService:
                     if req_type == "mandatory" and len(action_plan) < 5:
                         action_plan.append(f"Complete the practical assessment for {s_name} to upgrade your foundational {user_score}% score to proficient.")
             else:
-                provenance = f"Missing: Not detected in verified assessments, projects, or uploaded resume."
+                provenance = "Missing: Not detected in verified assessments, projects, or uploaded resume."
                 missing_skills.append({
                     "skill": s_name,
                     "category": cat,

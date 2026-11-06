@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundException
 from app.models.project import Project, ProjectAnalysis, ConnectedAccount
-from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.models.skill import Skill, EvidenceRecord
 from app.services.capability_service import recalculate_user_capability
 from app.models.activity import UserActivity
 from app.services.repo_inspector import repo_inspector
@@ -144,8 +144,6 @@ class ProjectService:
 
         # Ingest practical project evidence into UserCapability
         evidence_confidence = 0.7
-        target_score = 75.0 if is_code_verified else 65.0
-        target_band = "foundational" if is_code_verified else "claimed"
 
         for skill_name in demonstrated_skills:
             canonical = skill_name.title() if len(skill_name) > 3 else skill_name.upper()

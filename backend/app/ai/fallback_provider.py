@@ -271,7 +271,7 @@ class FallbackAIProvider(BaseLLMProvider):
                     "objectives": [
                         f"Understand core paradigms, standard libraries, and architectural patterns of {skill}.",
                         f"Design modular, reusable, and type-safe components or services using {skill}.",
-                        f"Implement automated tests and performance optimizations adhering to industry standards.",
+                        "Implement automated tests and performance optimizations adhering to industry standards.",
                     ],
                 },
                 {
@@ -327,7 +327,12 @@ class FallbackAIProvider(BaseLLMProvider):
 
     def generate_chat_response(self, user_prompt: str, context: Dict[str, Any]) -> str:
         prompt_lower = user_prompt.lower()
+        capabilities = context.get("capabilities", [])
+        cap_names = [c.get("skill_name") for c in capabilities if c.get("skill_name")]
+
         if "skill" in prompt_lower or "gap" in prompt_lower:
+            if cap_names:
+                return f"Based on your verified capabilities including {', '.join(cap_names)}, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
             return "Based on your verified capabilities and claimed skills, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
         elif "resume" in prompt_lower:
             return "Your resume claims have been ingested. Make sure to ground them with technical evidence in Assessments and Projects to make them credible to recruiters."

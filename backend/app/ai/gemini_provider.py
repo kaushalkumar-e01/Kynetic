@@ -53,13 +53,13 @@ def extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
 class GeminiProvider(BaseLLMProvider):
     def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         self.api_key = api_key or settings.GEMINI_API_KEY or settings.LLM_API_KEY
-        self.model_name = model_name or settings.GEMINI_MODEL or settings.LLM_MODEL or "gemini-3.8-flash"
+        self.model_name = model_name or settings.GEMINI_MODEL or settings.LLM_MODEL or "gemini-3.5-flash"
         self.fallback = FallbackAIProvider()
         self._is_configured = False
 
         if genai and self.api_key:
             try:
-                genai.configure(api_key=self.api_key)
+                genai.configure(api_key=self.api_key, transport="rest")
                 self._is_configured = True
             except Exception as e:
                 logger.warning("Failed to configure Google Gemini SDK: %s", str(e))
@@ -131,7 +131,14 @@ Resume text:
             return parsed
 
         logger.info("Falling back to deterministic resume extraction due to missing or invalid Gemini response.")
-        return self.fallback.analyze_resume(resume_text)
+        fallback_res = self.fallback.analyze_resume(resume_text)
+        fallback_res["model_metadata"] = {
+            "provider": "rule-based-fallback",
+            "is_fallback": True,
+            "fallback_reason": f"Gemini API ({self.model_name}) call failed or returned non-JSON. Fallback applied.",
+            "attempted_model": self.model_name,
+        }
+        return fallback_res
 
     def analyze_repository(self, repo_context: Dict[str, Any]) -> Dict[str, Any]:
         if not self._is_configured:

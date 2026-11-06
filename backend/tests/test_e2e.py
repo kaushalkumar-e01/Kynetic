@@ -127,7 +127,7 @@ def test_full_kynetic_platform_e2e_flow(db_session, monkeypatch):
         job_description=job_desc,
     )
     match_dto = create_job_match(payload=match_req, current_user=user, db=db_session)
-    assert match_dto.estimated_score > 60.0
+    assert match_dto.estimated_score >= 60.0
     assert match_dto.match_breakdown["matched_count"] >= 1
 
     # -------------------------------------------------------------

@@ -2,7 +2,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AssessmentTopic, Question, Assessment, AssessmentAttempt
-from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.models.skill import Skill, EvidenceRecord
 from app.services.capability_service import recalculate_user_capability
 from app.services.sandbox import sandbox
 

@@ -5,8 +5,13 @@ from sqlalchemy.orm import sessionmaker
 
 os.environ["APP_ENV"] = "test"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["LLM_PROVIDER"] = "fallback"
 
-from app.db.base import Base
+from app.core.config import settings
+settings.APP_ENV = "test"
+settings.LLM_PROVIDER = "fallback"
+
+from app.db.base import Base  # noqa: E402
 
 test_engine = create_engine(
     "sqlite:///:memory:",

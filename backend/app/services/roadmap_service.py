@@ -79,7 +79,7 @@ class RoadmapService:
                 "objectives": [
                     f"Understand core paradigms, standard libraries, and architectural patterns of {skill}.",
                     f"Design modular, reusable, and type-safe components or services using {skill}.",
-                    f"Implement automated tests and performance optimizations adhering to industry standards.",
+                    "Implement automated tests and performance optimizations adhering to industry standards.",
                 ],
             },
             {

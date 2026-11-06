@@ -1,29 +1,15 @@
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 
-from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.models.skill import EvidenceRecord, UserCapability
 
 
 def recalculate_user_capability(user_id: str, skill_id: str, db: Session) -> UserCapability:
     """
     Evidence-based proficiency and confidence calculation for a user skill.
-
-    Core Principles:
-    1. Claimed Skill: A claim (resume mention, manual claim, profile) represents
-       what the user says they know. Verified proficiency score starts at 0/100.
-       Claims never add proficiency score points.
-    2. Verified Proficiency: Derived from verified demonstration:
-       - Assessments (quizzes, coding challenges): difficulty-weighted (easy, medium, hard).
-         Attempts on the same unique question are de-duplicated to prevent score inflation.
-       - Projects: Practical evidence from projects (higher weight for code-verified repositories).
-    3. Confidence: How sufficient and reliable the overall evidence body is.
-    4. Progression Bands:
-       - score >= 80: "advanced"
-       - score >= 50: "proficient"
-       - score > 0:  "foundational"
-       - score == 0: "claimed" if claimed evidence exists, else "unverified"
     """
+    db.flush()
     evidence_records = (
         db.query(EvidenceRecord)
         .filter(EvidenceRecord.user_id == user_id, EvidenceRecord.skill_id == skill_id)

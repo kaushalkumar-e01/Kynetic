@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundException
 from app.models.resume import Resume, ResumeAnalysis
-from app.models.skill import Skill, EvidenceRecord, UserCapability
+from app.models.skill import Skill, EvidenceRecord
 from app.services.capability_service import recalculate_user_capability
 from app.models.activity import UserActivity
 from app.services.storage import storage_service

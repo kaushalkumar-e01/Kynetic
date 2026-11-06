@@ -1,11 +1,20 @@
+import os
 from typing import List, Optional
 from pydantic import computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ENV_FILES = (
+    os.path.join(_BASE_DIR, ".env"),
+    os.path.join(os.path.dirname(_BASE_DIR), ".env"),
+    ".env",
+    "backend/.env",
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"),
+        env_file=_ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -28,7 +37,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: Optional[str] = None
-    LLM_MODEL: Optional[str] = "gemini-3.8-flash"
+    LLM_MODEL: Optional[str] = "gemini-3.5-flash"
 
     @computed_field
     @property
@@ -38,7 +47,7 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def effective_gemini_model(self) -> str:
-        return self.GEMINI_MODEL or self.LLM_MODEL or "gemini-3.8-flash"
+        return self.GEMINI_MODEL or self.LLM_MODEL or "gemini-3.5-flash"
 
     STORAGE_PROVIDER: str = "local"
     STORAGE_LOCAL_DIR: str = "./uploads"
