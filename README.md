@@ -2,99 +2,250 @@
 
 **Turn Ambition Into Capability.**
 
-Kynetic is an AI-powered personalized capability-development platform. Its primary focus is helping students and job seekers prepare for internships and placements by understanding their current skills, testing their knowledge, analysing their projects, identifying skill gaps, and creating personalized learning roadmaps.
+Kynetic is an AI-powered personalized capability-development platform designed to help students and job seekers prepare for internships and technical roles by understanding their current skills, evaluating their knowledge through adaptive assessments, analysing their repositories, identifying skill gaps, and generating personalized learning roadmaps.
 
-Kynetic is a **persistent personal workspace**, not a one-time resume checker or forced step-by-step wizard. Each user has a private account where information, analyses, repositories, assessment history, goals, roadmaps, and progress remain available across logins.
+Kynetic is a **persistent personal workspace**, not a one-time resume checker. Each user has a private account where information, analyses, repositories, assessment history, goals, roadmaps, and progress remain available across sessions.
 
-## What makes Kynetic different?
+---
+
+## What Makes Kynetic Different?
 
 Kynetic combines three forms of evidence:
-1. **Resume/profile evidence** — what the user says they know.
-2. **Assessment evidence** — what the user demonstrates through quizzes and coding challenges.
-3. **Project evidence** — what can be supported by project descriptions, repositories, and implementation.
+1. **Resume & Profile Evidence** — what the candidate claims to know.
+2. **Assessment Evidence** — what the candidate demonstrates through adaptive quizzes, output prediction, bug identification, and coding challenges.
+3. **Project & Repository Evidence** — what can be verified through GitHub repository analysis and real-world implementation.
 
-A resume claim alone is not treated as verified proficiency.
+A resume claim alone is never treated as verified proficiency.
 
-## Main Modules
-- Personalized Dashboard and persistent workspace.
-- Resume intelligence and versioned analysis.
-- Adaptive quizzes and coding challenges (Easy, Medium, Hard).
-- Capability profile distinguishing claimed, assessed, and project-supported skills.
-- GitHub and project intelligence.
-- LinkedIn profile information through user-provided data or authorized integrations.
-- Placement/job matching and explainable skill gaps.
-- Personalized learning roadmaps.
-- Progress analytics and AI learning assistant.
+---
 
-## Persistent and Flexible by Design
-- User data is stored in the backend/database, not only in browser state.
-- Users can log out and return without losing progress.
-- Modules are independently accessible; there is no mandatory linear sequence.
-- Users can add/update resumes, projects, repositories, goals, and profile information over time.
-- Recommendations use saved information and evidence.
+## Architecture & Technology Stack
 
-## Planned Technology
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js, React, TypeScript |
-| Styling | Tailwind CSS |
-| Backend | Python, FastAPI, Pydantic |
-| Database | PostgreSQL |
-| ORM | SQLAlchemy |
-| Migrations | Alembic |
-| AI | LLM provider layer; embeddings/RAG where useful |
-| Integrations | GitHub API; authorized profile integrations |
-| Coding assessment | Isolated code-execution service |
+| Layer | Technology | Details |
+|---|---|---|
+| **Frontend** | Next.js 14, React 18, TypeScript | App Router, Tailwind CSS, Lucide icons |
+| **Backend** | Python 3.11+, FastAPI, Pydantic v2 | RESTful API, async lifespan, JWT authentication |
+| **Database** | SQLite + SQLAlchemy 2.0 | Portable, zero-configuration local database (`kynetic_dev.db`) |
+| **AI / LLM** | Google Gemini 2.5 Flash | Resume skill extraction, question generation, roadmap synthesis (with built-in local deterministic fallback) |
+| **Code Sandbox** | Piston / Judge0 isolated runner | Secure remote sandboxing with input/output validation |
 
-## Repository Structure
-```text
-Kynetic/
-├── frontend/
-│   └── .gitkeep
-├── backend/
-│   └── .gitkeep
-├── docs/
-│   ├── API_CONTRACT.md
-│   ├── TEAM_WORKFLOW.md
-│   ├── ARCHITECTURE.md
-│   ├── DATA_MODEL.md
-│   └── ASSESSMENT_AND_PROJECT_ANALYSIS.md
-├── plan.md
-├── README.md
-├── .env.example
-└── .gitignore
+---
+
+## Prerequisites for Developers
+
+Before setting up Kynetic on any operating system (Windows, macOS, or Linux), make sure you have:
+
+- **Git**: [Download Git](https://git-scm.com/downloads)
+- **Python**: Version **3.11** or higher ([python.org](https://www.python.org/downloads/))
+- **Node.js**: Version **18** or higher (LTS recommended) and **npm** ([nodejs.org](https://nodejs.org/))
+
+---
+
+## Quickstart (One-Click Launch)
+
+Kynetic includes automated dev launch scripts that detect dependencies, create virtual environments, install packages, initialize the SQLite database, seed 2,000+ catalog questions, and launch both servers simultaneously:
+
+### Windows
+Double-click `run-dev.bat` or run in PowerShell:
+```powershell
+.\run-dev.bat
 ```
 
-## Documentation
-- [Project plan](plan.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Data model](docs/DATA_MODEL.md)
-- [API contract](docs/API_CONTRACT.md)
-- [Assessment and project analysis](docs/ASSESSMENT_AND_PROJECT_ANALYSIS.md)
-- [Team workflow](docs/TEAM_WORKFLOW.md)
+### macOS / Linux
+Open a terminal and run:
+```bash
+chmod +x run-dev.sh
+./run-dev.sh
+```
 
-## Development Setup
-Application setup instructions will be added during the foundation milestone. Planned prerequisites:
-- Git
-- Python (version to be agreed)
-- Node.js and npm
-- PostgreSQL
-- Visual Studio Code or another editor
+Once running:
+- **Web Application**: Open [http://localhost:3000](http://localhost:3000)
+- **API Documentation**: Open [http://localhost:8000/docs](http://localhost:8000/docs)
+- **API Health Check**: Open [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
 
-Do not put real API keys, database passwords, OAuth secrets, or other credentials in this repository. Use local environment files based on `.env.example`; real environment files are ignored by Git.
+---
 
-## Team
-Three-member team:
-- Project coordination, repository management, documentation, and integration.
-- Backend development and AI integration.
-- Frontend development and API integration.
+## Manual Step-by-Step Setup
 
-See [TEAM_WORKFLOW.md](docs/TEAM_WORKFLOW.md).
+If you prefer to configure and run the backend and frontend in separate terminal windows:
 
-## Important Notes
-- AI match scores and capability estimates are estimates, not guaranteed employer ATS results or formal certifications.
-- External platform content must only be accessed and used as permitted.
-- Do not scrape LinkedIn or copy/redistribute LeetCode or HackerRank question banks without authorization.
-- User-submitted code must only run in an isolated, resource-limited environment.
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-org/Kynetic.git
+cd Kynetic
+```
 
-**Kynetic — Turn Ambition Into Capability.**
+### 2. Backend Setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Windows (cmd):
+.venv\Scripts\activate.bat
+# macOS / Linux:
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create environment configuration
+cp .env.example .env
+
+# Start the FastAPI server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+> **Automatic DB Initialization**: On the first run, the backend automatically creates `kynetic_dev.db` and populates it with all database tables and 2,000+ validated catalog questions across DSA, C, C++, Java, Python, JavaScript, SQL, and Web Development. No manual migration or seeding command is needed.
+
+### 3. Frontend Setup
+
+In a new terminal window:
+```bash
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Create local environment configuration
+cp .env.example .env.local
+
+# Start the Next.js development server
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## Environment Variables & Configuration
+
+### Backend (`backend/.env`)
+
+| Variable | Default Value | Description |
+|---|---|---|
+| `APP_ENV` | `development` | Runtime environment (`development`, `test`, `production`) |
+| `DATABASE_URL` | `sqlite:///./kynetic_dev.db` | SQLite database file location (portable relative path) |
+| `SECRET_KEY` | `kynetic-dev-secret-key-change-in-production-min32bytes` | JWT token signing key |
+| `CORS_ORIGINS` | `["http://localhost:3000","http://127.0.0.1:3000"]` | Allowed origins (development also permits dynamic loopback & LAN) |
+| `GEMINI_API_KEY` | *(optional)* | Google Gemini API Key for AI generation |
+| `PISTON_API_URL` | `https://emkc.org/api/v2/piston` | Remote isolated code execution engine |
+
+### Frontend (`frontend/.env.local`)
+
+| Variable | Default Value | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | Backend base URL (dynamically resolves hostname if unset) |
+| `NEXT_PUBLIC_APP_ENV` | `development` | Frontend runtime environment |
+| `NEXT_PUBLIC_MOCK_CODING_SANDBOX` | `false` | When `false`, uses remote sandbox for code execution |
+
+---
+
+## Google Gemini AI Setup & Local Fallback
+
+Kynetic uses Google Gemini for deep capability analysis, resume parsing, and dynamic question generation.
+
+### How to Configure Gemini:
+1. Generate an API key from [Google AI Studio](https://aistudio.google.com/).
+2. Add your key to `backend/.env`:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+3. Restart the backend server.
+
+### Local Deterministic Fallback (No Key Required):
+If `GEMINI_API_KEY` is not provided, **Kynetic will NOT crash or fail**. The backend includes built-in deterministic fallback engines that:
+- Serve pre-validated catalog questions across all difficulties and tracks.
+- Parse resumes using rule-based keyword extraction.
+- Provide structured roadmap suggestions.
+
+This ensures every new developer on the team can clone, run, and test the entire application immediately without waiting for API keys.
+
+---
+
+## Health Check & System Verification
+
+The backend provides a comprehensive health check at `GET /api/v1/health` that returns operational readiness without exposing sensitive keys:
+
+```json
+{
+  "status": "ok",
+  "app_env": "development",
+  "version": "1.0.0",
+  "database_connected": true,
+  "database_type": "sqlite",
+  "gemini_configured": true,
+  "active_questions_count": 2313
+}
+```
+
+---
+
+## Common Troubleshooting
+
+### 1. "Failed to fetch" or Connection Refused
+- **Cause**: The frontend is trying to talk to the backend, but the backend is not running or running on an incompatible address.
+- **Fix**:
+  - Verify backend is running on `http://127.0.0.1:8000` or `http://localhost:8000`.
+  - The frontend automatically detects whether you are accessing via `localhost`, `127.0.0.1`, or LAN IP (`192.168.x.x`) and routes API requests to the matching backend port 8000.
+  - If accessing from another device on the same local Wi-Fi, run the backend with `--host 0.0.0.0`.
+
+### 2. Port 8000 or 3000 Already in Use
+- **Windows**:
+  ```powershell
+  # Find PID using port 8000
+  netstat -ano | findstr :8000
+  # Stop the process
+  taskkill /PID <PID> /F
+  ```
+- **macOS / Linux**:
+  ```bash
+  lsof -ti :8000 | xargs kill -9
+  ```
+
+### 3. Missing Virtual Environment on Windows
+If running `.venv\Scripts\Activate.ps1` gives an execution policy error:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+---
+
+## Project Structure
+
+```text
+Kynetic/
+├── frontend/                   # Next.js 14 App Router frontend
+│   ├── app/                    # Pages & routing (assessments, resume, projects, etc.)
+│   ├── components/             # Reusable UI components & layouts
+│   ├── lib/                    # API client, state stores, utilities
+│   └── .env.example            # Frontend environment template
+├── backend/                    # FastAPI backend
+│   ├── app/
+│   │   ├── api/v1/             # Endpoints (auth, assessments, projects, health, etc.)
+│   │   ├── core/               # Configuration, security, database session
+│   │   ├── db/                 # Base models & migrations
+│   │   ├── models/             # SQLAlchemy ORM models
+│   │   ├── schemas/            # Pydantic request/response schemas
+│   │   └── services/           # Business logic (adaptive assessment, Gemini, sandbox)
+│   ├── tests/                  # Pytest test suite
+│   ├── requirements.txt        # Python dependencies
+│   ├── kynetic_dev.db          # Default local SQLite database (auto-generated)
+│   └── .env.example            # Backend environment template
+├── run-dev.bat                 # One-click Windows development launcher
+├── run-dev.sh                  # One-click macOS/Linux development launcher
+└── README.md                   # Project documentation & developer guide
+```
+
+---
+
+## Team & Contribution Guidelines
+
+- **Database**: SQLite is the standard local development database. All schema changes must be backward-compatible.
+- **Security**: Never commit `.env`, `.env.local`, API keys, or private user data to Git.
+- **Testing**: Run `pytest backend/tests/` before pushing commits to verify all API contracts remain intact.

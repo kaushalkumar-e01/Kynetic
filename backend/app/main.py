@@ -1,4 +1,6 @@
+import os
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +20,27 @@ from app.api.v1.endpoints.health import get_health
 logger = logging.getLogger("kynetic.startup")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Ensure local storage directories exist automatically
+    os.makedirs(settings.STORAGE_LOCAL_DIR, exist_ok=True)
+
+    # 2. In development or test, ensure database tables exist and seed initial bank if fresh
+    if settings.APP_ENV in ("development", "test"):
+        try:
+            from app.db.base import Base
+            from app.db.session import engine, SessionLocal
+            Base.metadata.create_all(bind=engine)
+
+            with SessionLocal() as db:
+                from app.services.assessment_service import assessment_service
+                assessment_service.seed_initial_bank_if_empty(db)
+        except Exception as e:
+            logger.warning("Startup database auto-initialization notice: %s", str(e))
+
+    yield
+
+
 def create_app() -> FastAPI:
     # Fail fast if APP_ENV is not development/test and SECRET_KEY is still insecure default
     default_insecure = "insecure-development-secret-key-replace-in-production"
@@ -33,16 +56,20 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
+        lifespan=lifespan,
     )
 
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # Configure CORS with local multi-port and LAN dev compatibility
+    cors_kwargs = {
+        "allow_origins": settings.cors_origins_list,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if settings.APP_ENV == "development":
+        cors_kwargs["allow_origin_regex"] = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$"
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     # Register Exception Handlers
     app.add_exception_handler(AppException, app_exception_handler)

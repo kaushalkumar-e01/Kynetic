@@ -136,43 +136,124 @@ class AssessmentService:
     @staticmethod
     def seed_initial_bank_if_empty(db: Session):
         topic_count = db.query(AssessmentTopic).count()
-        if topic_count > 0:
-            return
-
-        for topic_data in DEFAULT_TOPICS_AND_QUESTIONS:
-            topic = AssessmentTopic(
-                name=topic_data["topic"],
-                description=topic_data["description"],
-            )
-            db.add(topic)
-            db.flush()
-
-            # Ensure associated skill exists
-            skill_name = topic_data.get("skill", topic_data["topic"])
-            skill = db.query(Skill).filter(Skill.canonical_name == skill_name).first()
-            if not skill:
-                db.add(Skill(canonical_name=skill_name, category="concept"))
+        if topic_count == 0:
+            for topic_data in DEFAULT_TOPICS_AND_QUESTIONS:
+                topic = AssessmentTopic(
+                    name=topic_data["topic"],
+                    description=topic_data["description"],
+                )
+                db.add(topic)
                 db.flush()
 
-            for q_data in topic_data["questions"]:
-                diff_str = q_data.get("difficulty", "easy")
-                diff_lvl = adaptive_engine.get_difficulty_level_from_str(diff_str)
+                # Ensure associated skill exists
+                skill_name = topic_data.get("skill", topic_data["topic"])
+                skill = db.query(Skill).filter(Skill.canonical_name == skill_name).first()
+                if not skill:
+                    db.add(Skill(canonical_name=skill_name, category="concept"))
+                    db.flush()
+
+                for q_data in topic_data["questions"]:
+                    diff_str = q_data.get("difficulty", "easy")
+                    diff_lvl = adaptive_engine.get_difficulty_level_from_str(diff_str)
+                    q = Question(
+                        topic_id=topic.id,
+                        question_type=q_data["question_type"],
+                        difficulty=diff_str,
+                        difficulty_level=diff_lvl,
+                        title=q_data.get("title") or q_data.get("prompt", "")[:60],
+                        prompt=q_data["prompt"],
+                        options=q_data.get("options", []),
+                        evaluation_metadata=q_data["evaluation_metadata"],
+                        source_attribution=q_data.get("source_attribution"),
+                        validation_status="validated",
+                        is_active=True,
+                    )
+                    db.add(q)
+
+            db.commit()
+
+        # If question bank has fewer than 100 questions (e.g. fresh installation), ingest expanded catalog
+        q_count = db.query(Question).count()
+        if q_count < 100:
+            AssessmentService.seed_catalog_questions(db)
+
+    @staticmethod
+    def seed_catalog_questions(db: Session):
+        try:
+            from app.services.catalog import get_all_expanded_questions
+
+            def get_or_create_topic(name: str, desc: str, skill_name: str) -> AssessmentTopic:
+                t = db.query(AssessmentTopic).filter(AssessmentTopic.name == name).first()
+                if not t:
+                    t = AssessmentTopic(name=name, description=desc)
+                    db.add(t)
+                    db.flush()
+                s = db.query(Skill).filter(Skill.canonical_name == skill_name).first()
+                if not s:
+                    db.add(Skill(canonical_name=skill_name, category="concept"))
+                    db.flush()
+                return t
+
+            topic_map = {
+                "dsa": get_or_create_topic("Data Structures & Algorithms", "Algorithmic problem-solving, complexity, and data structures.", "Data Structures"),
+                "programming_languages": {
+                    "c": get_or_create_topic("C Programming", "Deep C language fundamentals, pointers, and memory model.", "C"),
+                    "cpp": get_or_create_topic("C++ Programming", "Modern C++ idioms, STL, templates, and RAII.", "C++"),
+                    "java": get_or_create_topic("Java Programming", "Enterprise Java, JVM memory model, and collections.", "Java"),
+                    "python": get_or_create_topic("Python Programming", "Pythonic programming, comprehensions, and runtime internals.", "Python"),
+                    "javascript": get_or_create_topic("JavaScript Programming", "Modern ECMAScript, event loop, and asynchronous primitives.", "JavaScript"),
+                },
+                "sql": get_or_create_topic("SQL & Database Systems", "Relational database design, ACID compliance, queries, and indexing.", "SQL"),
+                "web_development": get_or_create_topic("Web Development", "Modern fullstack architecture, React, Next.js, and web protocols.", "React"),
+                "cs_fundamentals": get_or_create_topic("Computer Science Fundamentals", "Operating systems, computer networks, distributed systems, and DevOps.", "Operating Systems"),
+            }
+
+            all_questions = get_all_expanded_questions()
+            existing_prompts = set(p[0] for p in db.query(Question.prompt).all())
+
+            for q_data in all_questions:
+                prompt = q_data["prompt"]
+                if prompt in existing_prompts:
+                    continue
+
+                category = q_data.get("category", "cs_fundamentals")
+                lang = q_data.get("programming_language")
+
+                if category == "programming_languages" and lang in topic_map["programming_languages"]:
+                    topic = topic_map["programming_languages"][lang]
+                elif category in topic_map and isinstance(topic_map[category], AssessmentTopic):
+                    topic = topic_map[category]
+                else:
+                    topic = topic_map["cs_fundamentals"]
+
+                diff_str = q_data.get("difficulty", "medium")
+                diff_lvl = q_data.get("difficulty_level", 3)
+
                 q = Question(
                     topic_id=topic.id,
+                    title=q_data.get("title"),
+                    category=category,
+                    subtopic=q_data.get("subtopic", "General"),
                     question_type=q_data["question_type"],
                     difficulty=diff_str,
                     difficulty_level=diff_lvl,
-                    title=q_data.get("title") or q_data.get("prompt", "")[:60],
-                    prompt=q_data["prompt"],
+                    programming_language=lang,
+                    prompt=prompt,
                     options=q_data.get("options", []),
                     evaluation_metadata=q_data["evaluation_metadata"],
-                    source_attribution=q_data.get("source_attribution"),
+                    source_attribution="Kynetic Validated Assessment Bank",
+                    source_name="Kynetic Validated Assessment Bank",
+                    source_license="CC-BY-4.0",
                     validation_status="validated",
+                    version=1,
                     is_active=True,
                 )
                 db.add(q)
+                existing_prompts.add(prompt)
 
-        db.commit()
+            db.commit()
+        except Exception:
+            db.rollback()
 
     @staticmethod
     def get_adaptive_next_difficulty(attempts: List[AssessmentAttempt]) -> str:

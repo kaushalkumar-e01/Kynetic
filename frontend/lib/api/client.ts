@@ -14,8 +14,17 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:8000/api/v1";
+export function getApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, "");
+  }
+  if (typeof window !== "undefined" && window.location.hostname) {
+    // Automatically match the browser's current hostname (localhost, 127.0.0.1, or LAN IP)
+    const host = window.location.hostname;
+    return `http://${host}:8000/api/v1`;
+  }
+  return "http://localhost:8000/api/v1";
+}
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
@@ -25,9 +34,10 @@ export interface RequestOptions extends Omit<RequestInit, "body"> {
 export async function apiClient<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { body, params, headers = {}, ...rest } = options;
 
+  const base = getApiBaseUrl();
   let url = endpoint.startsWith("http")
     ? endpoint
-    : `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+    : `${base}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   if (params) {
     const searchParams = new URLSearchParams();
@@ -65,12 +75,22 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
     finalBody = JSON.stringify(body);
   }
 
-  const response = await fetch(url, {
-    ...rest,
-    headers: finalHeaders,
-    body: finalBody,
-    credentials: "include", // Essential for HttpOnly cookie session management
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...rest,
+      headers: finalHeaders,
+      body: finalBody,
+      credentials: "include", // Essential for HttpOnly cookie session management
+    });
+  } catch (netErr: unknown) {
+    const rawMsg = netErr instanceof Error ? netErr.message : String(netErr);
+    throw new ApiError(0, {
+      code: "NETWORK_ERROR",
+      message: `Unable to connect to Kynetic backend API at ${url}. Please verify that the FastAPI backend is running on port 8000. (${rawMsg})`,
+      details: [{ url, originalError: rawMsg }],
+    });
+  }
 
   if (!response.ok) {
     let errorDetail: ApiErrorDetail = {

@@ -13,6 +13,7 @@ export * as goalsApi from "./goals";
 export * as placementApi from "./placement";
 export * as roadmapsApi from "./roadmaps";
 export * as assistantApi from "./assistant";
+export * as healthApi from "./health";
 
 // Legacy synchronous facades backed by mock data for backward compatibility during migration
 import {

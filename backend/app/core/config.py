@@ -35,6 +35,15 @@ class Settings(BaseSettings):
         if self.DATABASE_URL == "sqlite:///./kynetic_dev.db" or self.DATABASE_URL.endswith("./kynetic_dev.db"):
             db_path = os.path.join(_BASE_DIR, "kynetic_dev.db")
             clean_path = db_path.replace("\\", "/")
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            return f"sqlite:///{clean_path}"
+        elif self.DATABASE_URL.startswith("sqlite:///"):
+            raw_path = self.DATABASE_URL.replace("sqlite:///", "")
+            if not os.path.isabs(raw_path) and raw_path != ":memory:":
+                raw_path = os.path.join(_BASE_DIR, raw_path)
+            if raw_path != ":memory:":
+                os.makedirs(os.path.dirname(os.path.abspath(raw_path)), exist_ok=True)
+            clean_path = raw_path.replace("\\", "/")
             return f"sqlite:///{clean_path}"
         return self.DATABASE_URL
 
