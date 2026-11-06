@@ -24,12 +24,21 @@ class Question(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "questions"
 
     topic_id: Mapped[str] = mapped_column(String(36), ForeignKey("assessment_topics.id", ondelete="CASCADE"), index=True, nullable=False)
-    question_type: Mapped[str] = mapped_column(String(50), nullable=False)  # multiple_choice, multi_select, output_prediction, debugging, coding
-    difficulty: Mapped[str] = mapped_column(String(20), index=True, nullable=False)  # easy, medium, hard
+    category: Mapped[str] = mapped_column(String(100), default="cs_fundamentals", index=True, nullable=False)
+    subtopic: Mapped[Optional[str]] = mapped_column(String(100), index=True, nullable=True)
+    question_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)  # multiple_choice, multi_select, output_prediction, debugging, coding, sql, conceptual
+    difficulty: Mapped[str] = mapped_column(String(20), index=True, nullable=False)  # very_easy, easy, medium, hard, very_hard, expert
+    difficulty_level: Mapped[int] = mapped_column(Integer, default=2, index=True, nullable=False)  # 1 to 6
+    programming_language: Mapped[Optional[str]] = mapped_column(String(50), index=True, nullable=True)  # c, cpp, java, python, javascript, sql, none
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[Optional[list]] = mapped_column(JSON, default=list, nullable=True)  # List of choices for MCQ
-    evaluation_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # Hidden answers/test cases
+    evaluation_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # Hidden answers, test cases, rubrics
     source_attribution: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    source_name: Mapped[Optional[str]] = mapped_column(String(100), default="Kynetic Original Bank", nullable=True)
+    source_license: Mapped[Optional[str]] = mapped_column(String(100), default="CC-BY-4.0", nullable=True)
+    source_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    validation_status: Mapped[str] = mapped_column(String(50), default="validated", index=True, nullable=False)  # draft, pending, validated, rejected, retired
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     topic: Mapped["AssessmentTopic"] = relationship("AssessmentTopic", back_populates="questions")

@@ -15,11 +15,20 @@ class AssessmentTopicResponse(BaseModel):
 class QuestionPublicResponse(BaseModel):
     id: str
     topic_id: str
+    category: str = "cs_fundamentals"
+    subtopic: Optional[str] = None
     question_type: str
     difficulty: str
+    difficulty_level: int = 2
+    programming_language: Optional[str] = None
     prompt: str
     options: List[str] = []
+    starter_code: Optional[str] = None
+    constraints: Optional[List[str]] = None
+    sample_test_cases: Optional[List[Dict[str, Any]]] = None
+    schema_ddl: Optional[str] = None
     source_attribution: Optional[str] = None
+    validation_status: str = "validated"
 
     class Config:
         from_attributes = True
@@ -81,4 +90,31 @@ class AssessmentSummaryResultsResponse(BaseModel):
     average_score: float
     completed_at: Optional[datetime] = None
     attempts: List[AssessmentAttemptResponse] = []
+
+
+class QuestionBankStatsResponse(BaseModel):
+    total_questions: int
+    validated_questions: int
+    by_category: Dict[str, int]
+    by_difficulty: Dict[str, int]
+    by_question_type: Dict[str, int]
+    by_language: Dict[str, int]
+
+
+class AIGenerateBatchRequest(BaseModel):
+    skill_or_topic: str
+    category: str = "cs_fundamentals"
+    difficulty: str = "medium"
+    question_type: str = "coding"
+    batch_size: int = 10
+    programming_language: Optional[str] = None
+
+
+class AIGenerateBatchResponse(BaseModel):
+    requested: int
+    validated_and_saved: int
+    rejected_count: int
+    validation_errors: List[str] = []
+    topic: str
+    model_metadata: Dict[str, Any]
 

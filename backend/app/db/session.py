@@ -8,11 +8,11 @@ from app.core.config import settings
 logger = logging.getLogger("kynetic.db")
 
 connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
+if settings.effective_database_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.effective_database_url,
     connect_args=connect_args,
     pool_pre_ping=True,
 )

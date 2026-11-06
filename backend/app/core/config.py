@@ -29,6 +29,15 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./kynetic_dev.db"
 
+    @computed_field
+    @property
+    def effective_database_url(self) -> str:
+        if self.DATABASE_URL == "sqlite:///./kynetic_dev.db" or self.DATABASE_URL.endswith("./kynetic_dev.db"):
+            db_path = os.path.join(_BASE_DIR, "kynetic_dev.db")
+            clean_path = db_path.replace("\\", "/")
+            return f"sqlite:///{clean_path}"
+        return self.DATABASE_URL
+
     SECRET_KEY: str = "insecure-development-secret-key-replace-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

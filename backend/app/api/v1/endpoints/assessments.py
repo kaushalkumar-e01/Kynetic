@@ -18,8 +18,13 @@ from app.schemas.assessment import (
     AssessmentAttemptResponse,
     AssessmentResponse,
     AssessmentSummaryResultsResponse,
+    QuestionBankStatsResponse,
+    AIGenerateBatchRequest,
+    AIGenerateBatchResponse,
 )
 from app.services.assessment_service import assessment_service
+from app.services.question_bank_builder import question_bank_builder
+from app.services.question_bank_service import question_bank_service
 
 router = APIRouter()
 
@@ -285,4 +290,67 @@ def list_attempts(
         .all()
     )
     return [AssessmentAttemptResponse.model_validate(a) for a in attempts]
+
+
+@router.get(
+    "/question-bank/stats",
+    response_model=QuestionBankStatsResponse,
+    summary="Get comprehensive question bank statistics and distribution",
+)
+def get_question_bank_statistics(db: Session = Depends(get_db)):
+    return QuestionBankStatsResponse(**question_bank_builder.get_bank_statistics(db))
+
+
+@router.get(
+    "/question-bank/questions",
+    response_model=List[QuestionPublicResponse],
+    summary="Search and filter the question bank with pagination",
+)
+def search_question_bank(
+    category: Optional[str] = None,
+    topic: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    difficulty_level: Optional[int] = None,
+    question_type: Optional[str] = None,
+    programming_language: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    questions = question_bank_service.list_questions(
+        db=db,
+        category=category,
+        topic_name=topic,
+        difficulty=difficulty,
+        difficulty_level=difficulty_level,
+        question_type=question_type,
+        programming_language=programming_language,
+        search_query=search,
+        skip=skip,
+        limit=min(100, limit),
+    )
+    return [QuestionPublicResponse.model_validate(q) for q in questions]
+
+
+@router.post(
+    "/question-bank/generate-batch",
+    response_model=AIGenerateBatchResponse,
+    summary="Trigger automatic AI generation and validation of technical questions",
+)
+def generate_ai_questions_batch(
+    payload: AIGenerateBatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    result = question_bank_service.generate_ai_question_batch(
+        skill_or_topic=payload.skill_or_topic,
+        category=payload.category,
+        difficulty=payload.difficulty,
+        question_type=payload.question_type,
+        batch_size=payload.batch_size,
+        db=db,
+        programming_language=payload.programming_language,
+    )
+    return AIGenerateBatchResponse(**result)
 
