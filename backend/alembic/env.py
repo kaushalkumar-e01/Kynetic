@@ -21,8 +21,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set database URL dynamically from application settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set database URL dynamically from application settings (portable absolute path)
+config.set_main_option("sqlalchemy.url", settings.effective_database_url)
 
 target_metadata = Base.metadata
 
@@ -44,11 +44,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     connect_args = {}
-    if settings.DATABASE_URL.startswith("sqlite"):
+    if settings.effective_database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = settings.effective_database_url
 
     connectable = engine_from_config(
         configuration,

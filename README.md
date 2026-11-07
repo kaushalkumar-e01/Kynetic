@@ -67,16 +67,17 @@ Once running:
 
 ## Manual Step-by-Step Setup
 
-If you prefer to configure and run the backend and frontend in separate terminal windows:
+Follow these steps to set up and run Kynetic on any developer machine (Windows, macOS, or Linux):
 
-### 1. Clone the Repository
+### Step 1 — Clone the Repository
 ```bash
-git clone https://github.com/your-org/Kynetic.git
+git clone https://github.com/kaushalkumar-e01/Kynetic.git
 cd Kynetic
 ```
 
-### 2. Backend Setup
+### Step 2 — Install Dependencies
 
+#### Backend (Python 3.11+)
 ```bash
 cd backend
 
@@ -86,40 +87,72 @@ python -m venv .venv
 # Activate virtual environment
 # Windows (PowerShell):
 .venv\Scripts\Activate.ps1
-# Windows (cmd):
+# Windows (Command Prompt):
 .venv\Scripts\activate.bat
 # macOS / Linux:
 source .venv/bin/activate
 
-# Install dependencies
+# Install all required Python packages
 pip install -r requirements.txt
-
-# Create environment configuration
-cp .env.example .env
-
-# Start the FastAPI server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-> **Automatic DB Initialization**: On the first run, the backend automatically creates `kynetic_dev.db` and populates it with all database tables and 2,000+ validated catalog questions across DSA, C, C++, Java, Python, JavaScript, SQL, and Web Development. No manual migration or seeding command is needed.
-
-### 3. Frontend Setup
-
-In a new terminal window:
+#### Frontend (Node.js 18+)
+In a separate terminal:
 ```bash
 cd frontend
 
-# Install Node dependencies
+# Install Node dependencies using npm or pnpm
 npm install
+```
 
-# Create local environment configuration
+### Step 3 — Configure Environment Variables
+
+#### Backend Environment
+```bash
+# In the backend directory:
+cp .env.example .env
+```
+Edit `backend/.env` if you wish to configure live Google Gemini AI:
+- `GEMINI_API_KEY`: *(Optional)* Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
+- If left blank, Kynetic uses its built-in local deterministic AI engine.
+
+#### Frontend Environment
+```bash
+# In the frontend directory:
 cp .env.example .env.local
+```
+The default `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1` works immediately out of the box.
 
-# Start the Next.js development server
+### Step 4 — Initialize the Database
+
+The local SQLite database (`kynetic_dev.db`) is automatically initialized and seeded on backend startup. If you wish to explicitly apply Alembic database migrations:
+```bash
+cd backend
+python -m alembic upgrade head
+```
+
+### Step 5 — Start the Application
+
+#### Start the Backend Server (Terminal 1)
+```bash
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+#### Start the Frontend Development Server (Terminal 2)
+```bash
+cd frontend
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) in your browser.
+### Step 6 — Verify the Application
+
+Open your browser and verify:
+1. **Frontend**: [http://localhost:3000](http://localhost:3000) (Dashboard & Application)
+2. **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
+3. **Backend Health & Diagnostics**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+4. **AI Assistant**: Navigate to the **Assistant** tab and send a message.
+5. **Roadmaps**: Navigate to the **Roadmaps** tab to explore built-in curriculums (C, C++, Python, DSA, MySQL, Full Stack) with verified resources and interactive progress tracking.
 
 ---
 
@@ -127,22 +160,22 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Backend (`backend/.env`)
 
-| Variable | Default Value | Description |
-|---|---|---|
-| `APP_ENV` | `development` | Runtime environment (`development`, `test`, `production`) |
-| `DATABASE_URL` | `sqlite:///./kynetic_dev.db` | SQLite database file location (portable relative path) |
-| `SECRET_KEY` | `kynetic-dev-secret-key-change-in-production-min32bytes` | JWT token signing key |
-| `CORS_ORIGINS` | `["http://localhost:3000","http://127.0.0.1:3000"]` | Allowed origins (development also permits dynamic loopback & LAN) |
-| `GEMINI_API_KEY` | *(optional)* | Google Gemini API Key for AI generation |
-| `PISTON_API_URL` | `https://emkc.org/api/v2/piston` | Remote isolated code execution engine |
+| Variable | Required? | Default Value | Description |
+|---|---|---|---|
+| `APP_ENV` | Yes | `development` | Runtime environment (`development`, `test`, `production`) |
+| `DATABASE_URL` | Yes | `sqlite:///./kynetic_dev.db` | SQLite database file location (portable absolute resolution) |
+| `SECRET_KEY` | Yes | *(development default)* | JWT token signing key |
+| `CORS_ORIGINS` | No | `http://localhost:3000,http://127.0.0.1:3000` | Allowed origins (development permits loopback & LAN) |
+| `GEMINI_API_KEY` | Optional | *(empty)* | Google Gemini API Key from Google AI Studio |
+| `GEMINI_MODEL` | Optional | `gemini-2.5-flash` | Gemini model variant |
+| `LLM_PROVIDER` | Yes | `gemini` | `gemini` (with fallback) or `fallback` |
 
 ### Frontend (`frontend/.env.local`)
 
-| Variable | Default Value | Description |
-|---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | Backend base URL (dynamically resolves hostname if unset) |
-| `NEXT_PUBLIC_APP_ENV` | `development` | Frontend runtime environment |
-| `NEXT_PUBLIC_MOCK_CODING_SANDBOX` | `false` | When `false`, uses remote sandbox for code execution |
+| Variable | Required? | Default Value | Description |
+|---|---|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | Yes | `http://localhost:8000/api/v1` | Backend API base URL (auto-normalized by client) |
+| `NEXT_PUBLIC_USE_MOCKS` | No | `false` | When `false`, calls live backend |
 
 ---
 

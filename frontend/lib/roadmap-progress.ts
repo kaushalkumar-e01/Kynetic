@@ -11,9 +11,35 @@ export function loadUserProgress(userId?: string | null): UserProgressStore {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem(getStorageKey(userId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
+    let parsed: UserProgressStore = {};
+    if (raw) {
+      try {
+        const data = JSON.parse(raw);
+        if (typeof data === "object" && data !== null) {
+          parsed = data;
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    // Auto-migrate guest progress if the authenticated user has no saved progress yet
+    if (userId && userId.trim() && Object.keys(parsed).length === 0) {
+      const guestRaw = localStorage.getItem(getStorageKey(null));
+      if (guestRaw) {
+        try {
+          const guestData = JSON.parse(guestRaw);
+          if (typeof guestData === "object" && guestData !== null && Object.keys(guestData).length > 0) {
+            parsed = guestData;
+            saveUserProgress(userId, parsed);
+          }
+        } catch {
+          // Ignored
+        }
+      }
+    }
+
+    return parsed;
   } catch (err) {
     console.error("Failed to load user roadmap progress from localStorage", err);
     return {};

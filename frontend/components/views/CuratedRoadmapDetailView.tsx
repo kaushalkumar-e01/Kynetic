@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -46,6 +46,11 @@ export function CuratedRoadmapDetailView({
 }: CuratedRoadmapDetailViewProps) {
   // Store progress locally in component state for instant rendering
   const [userProgressStore, setUserProgressStore] = useState(() => loadUserProgress(userId));
+
+  // Sync state whenever authenticated userId resolves
+  useEffect(() => {
+    setUserProgressStore(loadUserProgress(userId));
+  }, [userId, roadmap.id]);
   const [topicSearch, setTopicSearch] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "essential" | "pending" | "completed">("all");
 

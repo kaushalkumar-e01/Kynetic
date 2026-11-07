@@ -343,39 +343,96 @@ class FallbackAIProvider(BaseLLMProvider):
         capabilities = context.get("capabilities", []) or context.get("top_skills", [])
         cap_names = [c.get("skill") or c.get("skill_name") for c in capabilities if c.get("skill") or c.get("skill_name")]
 
+        # Developer configuration notice when Gemini is selected but API key is missing
+        from app.core.config import settings
+        notice = ""
+        if (settings.LLM_PROVIDER or "").lower() == "gemini" and not settings.effective_gemini_api_key:
+            notice = (
+                "> 💡 **Setup Notice**: Live Gemini AI requires an API key. Add `GEMINI_API_KEY=your_key` in `backend/.env` for real-time model responses. "
+                "(Displaying Kynetic deterministic engineering knowledge response below)\n\n"
+            )
+
         has_workspace_context = bool(context and any(v for v in context.values() if v))
         if not has_workspace_context:
+            if "pointer" in prompt_lower or "c programming" in prompt_lower or (prompt_lower.startswith("c ") and "code" in prompt_lower):
+                return notice + (
+                    "### Pointers & Memory in C\n\n"
+                    "A **pointer** is a variable that stores the memory address of another variable. "
+                    "In C, pointers provide direct access to hardware memory and dynamic heap allocation.\n\n"
+                    "- **Address-of (`&`)**: Gets the memory location of a variable (e.g., `int *ptr = &x;`).\n"
+                    "- **Dereference (`*`)**: Accesses the value stored at the address (e.g., `int val = *ptr;`).\n"
+                    "- **Heap Allocation**: Allocate dynamic memory using `malloc(bytes)` or `calloc(num, size)` and always release it with `free(ptr)` to avoid memory leaks."
+                )
+            if "c++" in prompt_lower or "cpp" in prompt_lower:
+                return notice + (
+                    "### Modern C++ Principles\n\n"
+                    "Modern C++ (C++11 through C++20) emphasizes safety, zero-cost abstractions, and automatic resource management:\n\n"
+                    "- **RAII (Resource Acquisition Is Initialization)**: Object lifetimes manage resource acquisition and automatic destruction.\n"
+                    "- **Smart Pointers**: Replace raw `new`/`delete` with `std::unique_ptr` (exclusive ownership) and `std::shared_ptr` (reference-counted shared ownership).\n"
+                    "- **STL Containers & Algorithms**: Efficient contiguous structures (`std::vector`), lookup tables (`std::unordered_map`), and parallel algorithms."
+                )
+            if "dsa" in prompt_lower or "data structure" in prompt_lower or "algorithm" in prompt_lower or "binary search" in prompt_lower:
+                return notice + (
+                    "### Data Structures & Algorithms Core Concepts\n\n"
+                    "- **Time & Space Complexity**: Measured using Big-O notation ($O(1)$, $O(\\log n)$, $O(n)$, $O(n \\log n)$, $O(n^2)$).\n"
+                    "- **Linear Foundations**: Arrays (contiguous cache-friendly memory), Hash Tables (amortized $O(1)$ lookups), Linked Lists (pointer traversal).\n"
+                    "- **Hierarchical**: Binary Search Trees, Heaps/Priority Queues ($O(\\log n)$ insertion/removal), and Graphs (BFS/DFS traversal).\n"
+                    "- **Optimization Paradigms**: Two-pointer sliding windows, Divide & Conquer (Merge Sort), Dynamic Programming (overlapping subproblems)."
+                )
+            if "sql" in prompt_lower or "database" in prompt_lower or "mysql" in prompt_lower or "join" in prompt_lower:
+                return notice + (
+                    "### Relational Databases & SQL\n\n"
+                    "- **ACID Guarantees**: Atomicity, Consistency, Isolation, and Durability ensure reliable transaction processing.\n"
+                    "- **Relational Joins**: `INNER JOIN` (matching rows in both tables), `LEFT JOIN` (all left rows plus matching right rows), and self-joins for hierarchies.\n"
+                    "- **Indexing (B-Tree)**: Indexes provide $O(\\log n)$ row lookups on indexed columns; avoid functions in `WHERE` clauses to keep predicates sargable.\n"
+                    "- **Normalization**: 1NF (atomic values), 2NF (remove partial key dependencies), 3NF (remove transitive dependencies)."
+                )
             if "python" in prompt_lower:
-                return (
-                    "**Python** is a versatile, high-level programming language known for clear syntax, "
-                    "rich libraries (FastAPI, Django, PyTorch, Pandas), and wide use in web backends, data science, and AI."
+                return notice + (
+                    "### Python Architecture & Idioms\n\n"
+                    "**Python** is a high-level, dynamically typed language known for expressiveness and clean syntax:\n\n"
+                    "- **Data Model**: Everything is an object with type, identity (`id`), and value. Differentiates mutable types (`list`, `dict`, `set`) from immutable types (`int`, `str`, `tuple`).\n"
+                    "- **Resource Management**: Context managers (`with` statement) guarantee automatic resource cleanup via `__enter__` and `__exit__`.\n"
+                    "- **Generators (`yield`)**: Lazy stream evaluation that processes massive datasets with constant $O(1)$ memory consumption."
+                )
+            if "react" in prompt_lower or "frontend" in prompt_lower or "next.js" in prompt_lower:
+                return notice + (
+                    "### Modern Frontend & React Architecture\n\n"
+                    "- **Component Trees**: Declarative UI built with typed props and modular JSX components.\n"
+                    "- **Hooks Lifecycle**: `useState` for local reactive state, `useEffect` for side effects, and `useMemo`/`useCallback` for performance.\n"
+                    "- **Next.js App Router**: Hybrid rendering combining Server Components (zero client JS footprint) and interactive Client Components (`'use client'`)."
+                )
+            if "docker" in prompt_lower or "devops" in prompt_lower or "container" in prompt_lower:
+                return notice + (
+                    "### Containerization & Docker\n\n"
+                    "- **Images vs Containers**: An image is an immutable template; a container is a lightweight, isolated runnable instance sharing the host OS kernel.\n"
+                    "- **Multi-Stage Builds**: Drastically reduce production image sizes by separating compile-time dependencies from minimal runtime environments."
                 )
             if "rest" in prompt_lower or "api" in prompt_lower:
-                return (
-                    "**REST (Representational State Transfer)** is a standard API architecture using HTTP verbs (`GET`, `POST`, `PUT`, `DELETE`) "
-                    "to perform stateless operations on resource endpoints, typically returning JSON."
+                return notice + (
+                    "### RESTful API Architecture\n\n"
+                    "**REST (Representational State Transfer)** uses standard HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) with stateless requests and JSON payloads. "
+                    "Status codes indicate outcomes: `2xx` (Success), `3xx` (Redirect), `4xx` (Client Error), `5xx` (Server Error)."
                 )
             if "git" in prompt_lower:
-                return (
-                    "**Git** is a distributed version control system that tracks file changes, manages branches, and facilitates collaborative code development."
+                return notice + (
+                    "### Git Distributed Version Control\n\n"
+                    "**Git** tracks file revisions using directed acyclic graphs of SHA commit hashes. "
+                    "Key commands: `git status`, `git add`, `git commit -m`, `git branch`, and `git merge`."
                 )
-            if "sql" in prompt_lower or "join" in prompt_lower:
-                return (
-                    "**SQL Joins** combine records from two or more tables based on common keys (`INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL JOIN`)."
-                )
-            if "machine learning" in prompt_lower or "ml" in prompt_lower:
-                return (
-                    "**Machine Learning** is a domain of AI where algorithms discover patterns from data to make predictions or decisions without hardcoded rules."
-                )
-            return f"Regarding '{user_prompt}': In software engineering, this is a core technical topic. For comprehensive details, consult standard developer documentation and apply it in hands-on projects."
+            return notice + (
+                f"### Analysis: {user_prompt}\n\n"
+                f"This topic is an integral part of professional software engineering. "
+                "To explore this systematically, you can view our step-by-step **Curated Learning Roadmaps** (under Roadmaps) or take a self-directed technical assessment in **Assessments**."
+            )
 
         if "skill" in prompt_lower or "gap" in prompt_lower:
             if cap_names:
-                return f"Based on your verified capabilities including {', '.join(cap_names)}, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
-            return "Based on your verified capabilities and claimed skills, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
+                return notice + f"Based on your verified capabilities including {', '.join(cap_names)}, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
+            return notice + "Based on your verified capabilities and claimed skills, focus on completing validated assessments and pushing live code repositories to improve your capability confidence."
         elif "resume" in prompt_lower:
-            return "Your resume claims have been ingested. Make sure to ground them with technical evidence in Assessments and Projects to make them credible to recruiters."
-        return f"I am your Kynetic career co-pilot. I can help analyze your capabilities, explore placement matches, and generate learning roadmaps. (Question: '{user_prompt[:50]}...')"
+            return notice + "Your resume claims have been ingested. Make sure to ground them with technical evidence in Assessments and Projects to make them credible to recruiters."
+        return notice + f"I am your Kynetic career co-pilot. I can help analyze your capabilities, explore placement matches, and generate learning roadmaps. (Question: '{user_prompt[:50]}...')"
 
     def generate_question_batch(
         self,

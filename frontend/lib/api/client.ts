@@ -15,15 +15,27 @@ export class ApiError extends Error {
 }
 
 export function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, "");
+  let raw = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+
+  if (!raw) {
+    if (typeof window !== "undefined" && window.location.hostname) {
+      // Automatically match the browser's current hostname (localhost, 127.0.0.1, or LAN IP)
+      const host = window.location.hostname;
+      raw = `http://${host}:8000/api/v1`;
+    } else {
+      raw = "http://localhost:8000/api/v1";
+    }
   }
-  if (typeof window !== "undefined" && window.location.hostname) {
-    // Automatically match the browser's current hostname (localhost, 127.0.0.1, or LAN IP)
-    const host = window.location.hostname;
-    return `http://${host}:8000/api/v1`;
+
+  // Remove trailing slashes
+  raw = raw.replace(/\/+$/, "");
+
+  // Guarantee /api/v1 prefix exists so requests don't hit 404 if user omitted it
+  if (!raw.endsWith("/api/v1")) {
+    raw = `${raw}/api/v1`;
   }
-  return "http://localhost:8000/api/v1";
+
+  return raw;
 }
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {

@@ -65,31 +65,48 @@ class GeminiProvider(BaseLLMProvider):
                 logger.warning("Failed to configure Google Gemini SDK: %s", str(e))
 
     def _execute_with_retry(self, prompt: str, max_retries: int = 2) -> Optional[str]:
-        """Executes a prompt against Gemini with exponential backoff and timeout handling."""
+        """Executes a prompt against Gemini with exponential backoff, timeout handling, and model fallback."""
         if not self._is_configured or not genai:
             return None
 
-        for attempt in range(max_retries + 1):
-            try:
-                model = genai.GenerativeModel(self.model_name)
-                # Generation config with deterministic temperature
-                response = model.generate_content(
-                    prompt,
-                    generation_config={"temperature": 0.2, "top_p": 0.8},
-                )
-                if response and response.text:
-                    return response.text
-            except Exception as e:
-                err_str = str(e).lower()
-                # Check for rate limiting / transient errors
-                is_transient = "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str or "timeout" in err_str
-                if is_transient and attempt < max_retries:
-                    wait_time = (2 ** attempt) * 1.5
-                    logger.warning("Gemini rate limit or transient error on attempt %d. Retrying in %.1fs: %s", attempt + 1, wait_time, err_str[:120])
-                    time.sleep(wait_time)
-                else:
-                    logger.warning("Gemini API call failed on attempt %d: %s", attempt + 1, err_str[:150])
-                    break
+        # Candidate models ordered by priority to ensure cross-device / multi-account compatibility
+        candidate_models = [self.model_name]
+        for fallback_m in ["gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-flash", "gemini-3.5-flash"]:
+            if fallback_m not in candidate_models:
+                candidate_models.append(fallback_m)
+
+        for current_model_name in candidate_models:
+            for attempt in range(max_retries + 1):
+                try:
+                    model = genai.GenerativeModel(current_model_name)
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={"temperature": 0.2, "top_p": 0.8},
+                        request_options={"timeout": 15.0},
+                    )
+                    if response and response.text:
+                        # Remember working model for future calls
+                        if self.model_name != current_model_name:
+                            logger.info("Auto-switched Gemini model to supported variant: %s", current_model_name)
+                            self.model_name = current_model_name
+                        return response.text
+                except Exception as e:
+                    err_str = str(e).lower()
+                    # If model is not found (404), break immediately to try the next candidate model
+                    if "404" in err_str or "not found" in err_str:
+                        logger.info("Model %s not available on this API key (404), checking alternatives...", current_model_name)
+                        break
+
+                    # Check for rate limiting / transient errors
+                    is_transient = "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str or "timeout" in err_str
+                    if is_transient and attempt < max_retries:
+                        wait_time = (2 ** attempt) * 1.5
+                        logger.warning("Gemini transient error on attempt %d with %s. Retrying in %.1fs: %s", attempt + 1, current_model_name, wait_time, err_str[:120])
+                        time.sleep(wait_time)
+                    else:
+                        logger.warning("Gemini call failed on attempt %d with %s: %s", attempt + 1, current_model_name, err_str[:150])
+                        break
+
         return None
 
     def analyze_resume(self, resume_text: str) -> Dict[str, Any]:

@@ -28,6 +28,13 @@ export function RoadmapTopicAiModal({ topic, roadmapTitle, onClose }: RoadmapTop
         ? `Act as an expert computer science tutor. Provide a clear, intuitive, and practical explanation of the topic "${topic.title}" from the ${roadmapTitle} curriculum.\n\nContext & Objectives:\n${topic.learningObjectives.map((o) => `- ${o}`).join("\n")}\n\nPlease include:\n1. Core concept intuition (in plain English)\n2. Key mechanics with a concise, well-annotated code example\n3. Common beginner mistakes and traps to avoid\n4. Real-world engineering application.`
         : `Generate a hands-on practice challenge and 2 conceptual quiz questions to test mastery of "${topic.title}" from ${roadmapTitle}.\n\nContext & Objectives:\n${topic.learningObjectives.map((o) => `- ${o}`).join("\n")}\n\nInclude questions, hints, and expected answers/explanations hidden below.`;
 
+    const token = typeof window !== "undefined" ? localStorage.getItem("kynetic_access_token") : null;
+    if (!token) {
+      setError("Please log in to your Kynetic account to chat with the AI Topic Companion.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await assistantApi.sendMessage({ message: prompt });
       const lastMsg = res.messages && res.messages[res.messages.length - 1];
