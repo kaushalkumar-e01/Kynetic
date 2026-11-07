@@ -340,8 +340,34 @@ class FallbackAIProvider(BaseLLMProvider):
 
     def generate_chat_response(self, user_prompt: str, context: Dict[str, Any]) -> str:
         prompt_lower = user_prompt.lower()
-        capabilities = context.get("capabilities", [])
-        cap_names = [c.get("skill_name") for c in capabilities if c.get("skill_name")]
+        capabilities = context.get("capabilities", []) or context.get("top_skills", [])
+        cap_names = [c.get("skill") or c.get("skill_name") for c in capabilities if c.get("skill") or c.get("skill_name")]
+
+        has_workspace_context = bool(context and any(v for v in context.values() if v))
+        if not has_workspace_context:
+            if "python" in prompt_lower:
+                return (
+                    "**Python** is a versatile, high-level programming language known for clear syntax, "
+                    "rich libraries (FastAPI, Django, PyTorch, Pandas), and wide use in web backends, data science, and AI."
+                )
+            if "rest" in prompt_lower or "api" in prompt_lower:
+                return (
+                    "**REST (Representational State Transfer)** is a standard API architecture using HTTP verbs (`GET`, `POST`, `PUT`, `DELETE`) "
+                    "to perform stateless operations on resource endpoints, typically returning JSON."
+                )
+            if "git" in prompt_lower:
+                return (
+                    "**Git** is a distributed version control system that tracks file changes, manages branches, and facilitates collaborative code development."
+                )
+            if "sql" in prompt_lower or "join" in prompt_lower:
+                return (
+                    "**SQL Joins** combine records from two or more tables based on common keys (`INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `FULL JOIN`)."
+                )
+            if "machine learning" in prompt_lower or "ml" in prompt_lower:
+                return (
+                    "**Machine Learning** is a domain of AI where algorithms discover patterns from data to make predictions or decisions without hardcoded rules."
+                )
+            return f"Regarding '{user_prompt}': In software engineering, this is a core technical topic. For comprehensive details, consult standard developer documentation and apply it in hands-on projects."
 
         if "skill" in prompt_lower or "gap" in prompt_lower:
             if cap_names:

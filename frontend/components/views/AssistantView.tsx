@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { AlertCircle, ArrowRight, Loader2, Send, Sparkles, Trash2, User } from "lucide-react";
 import { assistantApi } from "@/lib/api";
 import type { ConversationResponse, ConversationSummaryResponse } from "@/types";
+import AssistantMarkdown from "./AssistantMarkdown";
 
 export default function AssistantView() {
   const [conversations, setConversations] = useState<ConversationSummaryResponse[]>([]);
@@ -14,6 +15,17 @@ export default function AssistantView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Clean up any ongoing request on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const loadConversations = () => {
     setLoading(true);
@@ -41,36 +53,67 @@ export default function AssistantView() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [currentConversation?.messages]);
+  }, [currentConversation?.messages, sending]);
 
   const handleSendMessage = async (promptText?: string) => {
     const text = promptText || inputMessage;
     if (!text.trim() || sending) return;
+
+    // Abort any existing in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setSending(true);
     setErrorMessage(null);
     setInputMessage("");
 
     try {
-      const updated = await assistantApi.sendMessage({
-        message: text.trim(),
-        conversation_id: currentConversation?.id,
-      });
+      const updated = await assistantApi.sendMessage(
+        {
+          message: text.trim(),
+          conversation_id: currentConversation?.id,
+        },
+        controller.signal
+      );
 
-      setCurrentConversation(updated);
-      assistantApi.listConversations().then((c) => setConversations(c));
+      if (!controller.signal.aborted) {
+        setCurrentConversation(updated);
+        assistantApi.listConversations().then((c) => setConversations(c));
+      }
     } catch (err: unknown) {
+      if (controller.signal.aborted) {
+        return;
+      }
       if (err instanceof Error) {
+        if (err.name === "AbortError" || err.message.toLowerCase().includes("aborted")) {
+          return;
+        }
         setErrorMessage(err.message);
       } else {
         setErrorMessage("Failed to send message.");
       }
     } finally {
-      setSending(false);
+      if (abortControllerRef.current === controller) {
+        setSending(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
   const handleSelectConversation = async (convId: string) => {
+    if (currentConversation?.id === convId) return;
+
+    // Cleanly cancel any in-flight request when switching conversations
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setSending(false);
+
     setLoading(true);
     try {
       const conv = await assistantApi.getConversation(convId);
@@ -80,6 +123,16 @@ export default function AssistantView() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNewChat = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setSending(false);
+    setErrorMessage(null);
+    setCurrentConversation(null);
   };
 
   const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
@@ -130,7 +183,7 @@ export default function AssistantView() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>Conversations</span>
             <button
-              onClick={() => setCurrentConversation(null)}
+              onClick={handleNewChat}
               className="btn btn-ghost"
               style={{ padding: "4px 8px", fontSize: 11 }}
             >
@@ -140,9 +193,16 @@ export default function AssistantView() {
 
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
             {conversations.length === 0 ? (
-              <p className="muted" style={{ fontSize: 11, padding: 12 }}>
-                No past conversations.
-              </p>
+              loading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 12, color: "var(--muted)", fontSize: 11 }}>
+                  <Loader2 size={12} className="animate-spin" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />
+                  <span>Loading...</span>
+                </div>
+              ) : (
+                <p className="muted" style={{ fontSize: 11, padding: 12 }}>
+                  No past conversations.
+                </p>
+              )
             ) : (
               conversations.map((c) => {
                 const isActive = currentConversation?.id === c.id;
@@ -255,7 +315,11 @@ export default function AssistantView() {
                         lineHeight: 1.5,
                       }}
                     >
-                      {msg.content}
+                      {isUser ? (
+                        msg.content
+                      ) : (
+                        <AssistantMarkdown content={msg.content} />
+                      )}
                     </div>
                     {isUser && (
                       <div className="avatar" style={{ background: "var(--surface-2)", color: "var(--muted)", flexShrink: 0 }}>
@@ -265,6 +329,40 @@ export default function AssistantView() {
                   </div>
                 );
               })
+            )}
+            {sending && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  alignSelf: "flex-start",
+                  maxWidth: "80%",
+                }}
+              >
+                <div className="avatar" style={{ background: "var(--accent-soft)", color: "var(--accent)", flexShrink: 0 }}>
+                  <Sparkles size={13} />
+                </div>
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background: "var(--surface-2)",
+                    color: "var(--muted)",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Loader2
+                    size={13}
+                    className="animate-spin"
+                    style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}
+                  />
+                  <span>Thinking...</span>
+                </div>
+              </div>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -285,7 +383,15 @@ export default function AssistantView() {
               disabled={sending}
             />
             <button type="submit" className="btn btn-primary" disabled={!inputMessage.trim() || sending}>
-              {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {sending ? (
+                <Loader2
+                  size={14}
+                  className="animate-spin"
+                  style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}
+                />
+              ) : (
+                <Send size={14} />
+              )}
             </button>
           </form>
         </div>
@@ -293,4 +399,3 @@ export default function AssistantView() {
     </div>
   );
 }
-

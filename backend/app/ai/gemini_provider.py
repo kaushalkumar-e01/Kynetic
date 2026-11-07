@@ -311,9 +311,20 @@ Requirements:
         if not self._is_configured:
             return self.fallback.generate_chat_response(user_prompt, context)
 
-        # Build clean workspace context string
-        context_str = json.dumps(context, indent=2, default=str)
-        prompt = f"""
+        # If no workspace context is provided (e.g. Type B General Knowledge), use a focused technical prompt
+        has_workspace_context = bool(context and any(v for v in context.values() if v))
+        if not has_workspace_context:
+            prompt = f"""
+You are the Kynetic Technical & Engineering Assistant.
+User Inquiry:
+{user_prompt}
+
+Provide a concise, accurate, clear, and direct explanation. Use clean Markdown with bullet points, bold text, or code examples where appropriate. Do not reference candidate profile data or apologize for missing workspace records.
+"""
+        else:
+            # Build clean workspace context string
+            context_str = json.dumps(context, indent=2, default=str)
+            prompt = f"""
 You are the Kynetic Career & Capability Co-Pilot, an intelligent career advisor grounded in real capability data.
 Candidate's Authorized Workspace Context:
 {context_str[:8000]}

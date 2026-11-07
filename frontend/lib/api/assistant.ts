@@ -5,7 +5,10 @@ import type {
   SendMessageRequest,
 } from "@/types";
 
-export async function sendMessage(data: SendMessageRequest): Promise<ConversationResponse> {
+export async function sendMessage(
+  data: SendMessageRequest,
+  signal?: AbortSignal
+): Promise<ConversationResponse> {
   if (shouldUseMock("assistant")) {
     return {
       id: data.conversation_id || "conv-mock-1",
@@ -31,6 +34,7 @@ export async function sendMessage(data: SendMessageRequest): Promise<Conversatio
   return apiClient<ConversationResponse>("/assistant/messages", {
     method: "POST",
     body: data,
+    signal,
   });
 }
 
